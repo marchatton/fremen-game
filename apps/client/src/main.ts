@@ -5,6 +5,7 @@ import { InputManager } from './core/InputManager';
 import { Player } from './entities/Player';
 import { FPSCounter } from './ui/FPSCounter';
 import { NetworkManager } from './networking/NetworkManager';
+import { PredictionManager } from './core/PredictionManager';
 import * as THREE from 'three';
 
 console.log('Fremen Game - Client Starting');
@@ -19,6 +20,7 @@ const camera = renderer.getCamera();
 const cameraController = new CameraController(camera, canvas);
 const inputManager = new InputManager();
 const fpsCounter = new FPSCounter();
+const predictionManager = new PredictionManager();
 
 const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 const network = new NetworkManager(serverUrl);
@@ -46,7 +48,19 @@ network.onState((data) => {
       console.log(`Added player: ${playerState.id}`);
     }
 
-    player.setPosition(playerState.position.x, playerState.position.y, playerState.position.z);
+    if (playerState.id === localPlayerId && data.lastProcessedInputSeq !== undefined) {
+      const reconciledPosition = predictionManager.reconcile(
+        playerState.position,
+        data.lastProcessedInputSeq,
+        player.getPosition(),
+        5,
+        0.016
+      );
+      player.setPosition(reconciledPosition.x, reconciledPosition.y, reconciledPosition.z);
+    } else {
+      player.setPosition(playerState.position.x, playerState.position.y, playerState.position.z);
+    }
+    
     player.setRotation(playerState.rotation);
   }
 
@@ -89,8 +103,24 @@ function animate() {
         localPlayer.setRotation(rotation);
       }
 
-      if (network.isConnected()) {
-        network.sendInput(movement, rotation);
+      if (network.isConnected() && (movement.forward !== 0 || movement.right !== 0)) {
+        const speed = 5;
+        const dx = movement.right * speed * deltaTime;
+        const dz = -movement.forward * speed * deltaTime;
+        
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        
+        const predictedPos = localPlayer.getPosition();
+        predictedPos.x += dx * cos - dz * sin;
+        predictedPos.z += dx * sin + dz * cos;
+        
+        const seq = network.sendInput(movement, rotation);
+        predictionManager.addInput(seq, movement, rotation, {
+          x: predictedPos.x,
+          y: predictedPos.y,
+          z: predictedPos.z,
+        });
       }
       
       cameraController.setTarget(localPlayer.getPosition());

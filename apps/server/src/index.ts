@@ -27,8 +27,9 @@ app.get('/auth/token', (req, res) => {
   res.json({ token });
 });
 
+const WORLD_SEED = 12345;
 const mainRoom = new Room('main');
-const gameLoop = new GameLoop(mainRoom);
+const gameLoop = new GameLoop(mainRoom, WORLD_SEED);
 gameLoop.start();
 
 io.use((socket, next) => {
@@ -61,7 +62,7 @@ io.on('connection', (socket) => {
   socket.emit('welcome', {
     type: 'S_WELCOME',
     playerId,
-    seed: 12345,
+    seed: WORLD_SEED,
     timestamp: Date.now(),
   });
 

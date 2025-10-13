@@ -1,14 +1,17 @@
 import { GAME_CONSTANTS } from '@fremen/shared';
 import type { Room } from './Room';
+import { Physics } from './sim/Physics';
 
 export class GameLoop {
   private room: Room;
+  private physics: Physics;
   private tickCount = 0;
   private lastTickTime = Date.now();
   private intervalId?: NodeJS.Timeout;
 
-  constructor(room: Room) {
+  constructor(room: Room, seed: number) {
     this.room = room;
+    this.physics = new Physics(seed);
   }
 
   start() {
@@ -47,24 +50,32 @@ export class GameLoop {
     const players = this.room.getAllPlayers();
     
     for (const player of players) {
-      player.state.position.x += player.state.velocity.x * deltaTime;
-      player.state.position.y += player.state.velocity.y * deltaTime;
-      player.state.position.z += player.state.velocity.z * deltaTime;
+      if (!this.physics.validatePlayerSpeed(player.state.velocity)) {
+        console.warn(`Speed hack detected for player ${player.playerId}`);
+        player.state.velocity = this.physics.clampVelocity(player.state.velocity);
+      }
+
+      player.state.position = this.physics.validatePlayerPosition(
+        player.state.position,
+        player.state.velocity,
+        deltaTime
+      );
     }
   }
 
   private broadcastState() {
     const players = this.room.getAllPlayers();
     
-    const stateMessage = {
-      type: 'S_STATE',
-      timestamp: Date.now(),
-      players: players.map(p => p.state),
-      worms: [],
-      thumpers: [],
-    };
-
     for (const player of players) {
+      const stateMessage = {
+        type: 'S_STATE',
+        timestamp: Date.now(),
+        lastProcessedInputSeq: player.lastInputSeq,
+        players: players.map(p => p.state),
+        worms: [],
+        thumpers: [],
+      };
+      
       player.socket.emit('state', stateMessage);
     }
   }

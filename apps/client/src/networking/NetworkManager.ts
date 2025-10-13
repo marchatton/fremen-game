@@ -80,8 +80,8 @@ export class NetworkManager {
     }, 2000);
   }
 
-  sendInput(movement: { forward: number; right: number }, rotation: number) {
-    if (!this.socket || !this.connected) return;
+  sendInput(movement: { forward: number; right: number }, rotation: number): number {
+    if (!this.socket || !this.connected) return this.inputSeq;
 
     this.inputSeq++;
     const inputMessage = {
@@ -93,6 +93,7 @@ export class NetworkManager {
     };
 
     this.socket.emit('input', inputMessage);
+    return this.inputSeq;
   }
 
   onWelcome(callback: (data: S_WELCOME) => void) {
