@@ -1,0 +1,16 @@
+{
+  "name": "fremen-game",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --parallel build",
+    "dev": "pnpm --parallel dev",
+    "test": "pnpm --parallel test",
+    "lint": "pnpm --parallel lint",
+    "typecheck": "pnpm --parallel typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

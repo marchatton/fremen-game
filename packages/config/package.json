@@ -1,0 +1,8 @@
+{
+  "name": "@fremen/config",
+  "version": "0.1.0",
+  "files": [
+    "eslint.config.js",
+    "tsconfig.base.json"
+  ]
+}

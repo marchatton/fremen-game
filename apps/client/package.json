@@ -1,0 +1,27 @@
+{
+  "name": "@fremen/client",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@fremen/shared": "workspace:*",
+    "@fremen/protocol": "workspace:*",
+    "three": "^0.160.0",
+    "socket.io-client": "^4.7.0",
+    "simplex-noise": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.160.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11"
+  }
+}

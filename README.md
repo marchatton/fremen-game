@@ -1,127 +1,71 @@
 # Fremen's Vengeance
 
-A tactical multiplayer game where Fremen squads coordinate to attract, mount, and ride sandworms across the deserts of Arrakis. Deploy thumpers strategically, manage water resources, complete objectives, and evade Harkonnen patrols in this low-poly procedural experience.
+A tactical multiplayer game where Fremen squads coordinate to attract, mount, and ride sandworms to complete objectives.
 
-## 🎮 Core Gameplay
+## Tech Stack
 
-- **Squad Cooperation**: 2-4 players with specialized roles (Scout, Thumper Specialist, Rider, Harvester)
-- **Worm Riding**: Deploy thumpers to attract sandworms, mount them, and steer across the desert
-- **Strategic Risk/Reward**: Louder thumpers attract worms faster but also alert enemies
-- **Resource Management**: Balance water survival with spice collection
-- **PvE Combat**: Defend against Harkonnen AI patrols and assault their outposts
-
-## 🛠 Tech Stack
-
-- **Client**: Three.js + Vite + TypeScript (deployed on Vercel)
-- **Server**: Node.js + Socket.io + TypeScript (deployed on Railway)
+- **Client**: Three.js + Vite + TypeScript
+- **Server**: Node.js + Socket.io + TypeScript  
+- **Package Manager**: pnpm (monorepo)
 - **Database**: DrizzleORM + PostgreSQL
-- **Package Manager**: pnpm with monorepo workspaces
-- **Network**: Authoritative server with client prediction/reconciliation
-- **Graphics**: Low-poly procedural generation, vertex colors, toon shading
 
-## 📁 Repository Structure
-
-```
-fremen-game/
-├── apps/
-│   ├── client/          # Three.js frontend
-│   └── server/          # Node.js backend
-├── packages/
-│   ├── shared/          # Shared types & constants
-│   ├── protocol/        # Network message schemas
-│   └── config/          # Shared tooling configs
-├── docs/                # Architecture & design docs
-│   ├── 00-overview.md
-│   ├── 01-architecture.md
-│   ├── 02-network-protocol.md
-│   ├── 03-gameplay-mechanics.md
-│   ├── 04-edge-cases-resilience.md
-│   ├── 05-diagrams.md
-│   └── milestones/      # VS1-VS6 development plan
-└── AGENTS.md            # AI coding assistant guide
-
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Development mode (runs both client and server)
+# Start development (client + server)
 pnpm run dev
 
 # Build all packages
-pnpm run --parallel build
+pnpm run build
 
 # Run tests
 pnpm test
 
-# Type checking
-pnpm run typecheck
-
-# Linting
+# Lint
 pnpm run lint
+
+# Typecheck
+pnpm run typecheck
 ```
 
-## 📖 Documentation
+## Project Structure
 
-Start with these key documents:
+```
+apps/
+  client/          # Three.js + Vite frontend
+  server/          # Node.js + Socket.io backend
+packages/
+  shared/          # Types, constants, utilities
+  protocol/        # Network message schemas
+  config/          # Shared tsconfig/eslint
+docs/              # Architecture & milestone docs
+```
 
-1. **[Overview](docs/00-overview.md)** - Vision, MVP, roadmap
-2. **[Architecture](docs/01-architecture.md)** - Monorepo structure, state sync, testing strategy
-3. **[Network Protocol](docs/02-network-protocol.md)** - Message schemas, timing, interest management
-4. **[Gameplay Mechanics](docs/03-gameplay-mechanics.md)** - Worm behavior, combat, resources, progression
-5. **[Edge Cases](docs/04-edge-cases-resilience.md)** - Bot backfill, disconnections, exploits, failures
-6. **[Diagrams](docs/05-diagrams.md)** - Visual architecture references
+## Development Phase
 
-### Development Milestones
+**Current**: Pre-VS1 (Scaffolding Complete)  
+**Next**: VS1 - Online Sandbox (2-4 weeks)
 
-The project follows **vertical slice** development (VS1-VS6):
+See [docs/milestones/VS1-online-sandbox.md](docs/milestones/VS1-online-sandbox.md) for details.
 
-- **VS1** (2-4 weeks): Online Sandbox - Basic networking, terrain, worm patrol, thumper attraction
-- **VS2** (4-6 weeks): **Worm Riding Core** ⭐ - Mount/steer mechanics, first playable objective
-- **VS3** (3-4 weeks): Resource Loop - Spice harvesting, water survival, persistence
-- **VS4** (4-5 weeks): PvE Combat - Harkonnen AI, combat system, bot backfill
-- **VS5** (3-4 weeks): Squad Cooperation - Role specialization, team objectives
-- **VS6** (4-6 weeks): Polish & Scale - Performance, UI/UX, stability, launch prep
+## Environment Setup
 
-**Total estimated timeline**: 5-6 months to public playtest
+```bash
+# Client
+cp apps/client/.env.example apps/client/.env
 
-## 🎯 Development Philosophy
+# Server
+cp apps/server/.env.example apps/server/.env
+```
 
-- **TDD**: Test-first for core systems (movement, state sync, combat)
-- **SOLID**: Single responsibility, dependency inversion
-- **YAGNI**: Start simple (JSON protocol), add complexity only when metrics demand it
-- **Vertical Slices**: Build playable features end-to-end rather than horizontal layers
-- **Edge-Case Ready**: Bot backfill, disconnection handling, and exploit prevention from day one
+## Documentation
 
-## 🤝 Contributing
+- [00-overview.md](docs/00-overview.md) - Vision & roadmap
+- [VS1-online-sandbox.md](docs/milestones/VS1-online-sandbox.md) - Current milestone
 
-This is currently a personal project. Documentation is maintained for AI coding assistants and potential collaborators.
+## License
 
-See [AGENTS.md](AGENTS.md) for AI assistant guidelines.
-
-## 📊 Current Status
-
-**Phase**: Documentation & Planning (Pre-VS1)
-
-- [x] Architecture design
-- [x] Network protocol specification  
-- [x] Gameplay mechanics design
-- [x] Edge case planning
-- [x] Milestone breakdown
-- [ ] Monorepo scaffolding (VS1 start)
-- [ ] Basic networking (VS1)
-- [ ] Worm riding prototype (VS2)
-
-## 📝 License
-
-MIT License - See [LICENSE](LICENSE) file for details
-
-## 🌟 Inspiration
-
-Inspired by Frank Herbert's Dune universe with gameplay influences from:
-- Fortnite (network architecture, client prediction)
-- Unturned (low-poly aesthetic)
-- Deep Rock Galactic (cooperative PvE, role specialization)
+See [LICENSE](LICENSE)
