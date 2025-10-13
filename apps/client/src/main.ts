@@ -25,8 +25,11 @@ const predictionManager = new PredictionManager();
 const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 const network = new NetworkManager(serverUrl);
 
+import { Worm } from './entities/Worm';
+
 let localPlayerId: string | null = null;
 const players = new Map<string, Player>();
+const worms = new Map<string, Worm>();
 
 network.onWelcome((data) => {
   localPlayerId = data.playerId;
@@ -70,6 +73,29 @@ network.onState((data) => {
       scene.remove(player.getMesh());
       players.delete(id);
       console.log(`Removed player: ${id}`);
+    }
+  }
+
+  for (const wormState of data.worms) {
+    let worm = worms.get(wormState.id);
+    
+    if (!worm) {
+      worm = new Worm(wormState.id);
+      worms.set(wormState.id, worm);
+      scene.add(worm.getGroup());
+      console.log(`Added worm: ${wormState.id}`);
+    }
+
+    worm.updateFromState(wormState);
+  }
+
+  const currentWormIds = new Set(data.worms.map(w => w.id));
+  for (const [id, worm] of worms) {
+    if (!currentWormIds.has(id)) {
+      scene.remove(worm.getGroup());
+      worm.dispose();
+      worms.delete(id);
+      console.log(`Removed worm: ${id}`);
     }
   }
 });

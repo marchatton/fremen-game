@@ -1,10 +1,12 @@
 import { GAME_CONSTANTS } from '@fremen/shared';
 import type { Room } from './Room';
 import { Physics } from './sim/Physics';
+import { WormAI } from './sim/WormAI';
 
 export class GameLoop {
   private room: Room;
   private physics: Physics;
+  private wormAI: WormAI;
   private tickCount = 0;
   private lastTickTime = Date.now();
   private intervalId?: NodeJS.Timeout;
@@ -12,6 +14,7 @@ export class GameLoop {
   constructor(room: Room, seed: number) {
     this.room = room;
     this.physics = new Physics(seed);
+    this.wormAI = new WormAI();
   }
 
   start() {
@@ -61,10 +64,13 @@ export class GameLoop {
         deltaTime
       );
     }
+
+    this.wormAI.update(deltaTime);
   }
 
   private broadcastState() {
     const players = this.room.getAllPlayers();
+    const worms = this.wormAI.getWorms();
     
     for (const player of players) {
       const stateMessage = {
@@ -72,7 +78,7 @@ export class GameLoop {
         timestamp: Date.now(),
         lastProcessedInputSeq: player.lastInputSeq,
         players: players.map(p => p.state),
-        worms: [],
+        worms,
         thumpers: [],
       };
       

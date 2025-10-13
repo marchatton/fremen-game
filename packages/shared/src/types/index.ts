@@ -13,8 +13,9 @@ export interface PlayerState {
 
 export interface WormState {
   id: string;
-  segments: Vector3[];
+  controlPoints: Vector3[];
   targetPosition?: Vector3;
+  speed: number;
 }
 
 export interface ThumperState {
