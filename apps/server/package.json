@@ -11,10 +11,12 @@
     "test": "echo 'No tests yet'"
   },
   "dependencies": {
-    "@fremen/shared": "workspace:*",
     "@fremen/protocol": "workspace:*",
-    "socket.io": "^4.7.0",
+    "@fremen/shared": "workspace:*",
+    "@types/express": "^5.0.3",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.7.0",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
