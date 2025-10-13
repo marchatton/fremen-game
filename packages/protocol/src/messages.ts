@@ -10,8 +10,7 @@ export interface C_INPUT {
   };
   rotation: number;
   action?: {
-    type: 'thumper';
-    position?: Vector3;
+    type: 'deployThumper';
   };
 }
 

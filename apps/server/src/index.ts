@@ -77,6 +77,16 @@ io.on('connection', (socket) => {
 
     player.lastInputSeq = data.seq;
 
+    if (data.action?.type === 'deployThumper') {
+      const deployed = mainRoom.deployThumper(playerId);
+      if (deployed) {
+        socket.emit('thumperDeployed', { success: true });
+      } else {
+        socket.emit('thumperDeployed', { success: false, reason: 'No thumpers available' });
+      }
+      return;
+    }
+
     const { movement, rotation } = data;
     const speed = GAME_CONSTANTS.PLAYER_MAX_SPEED;
     

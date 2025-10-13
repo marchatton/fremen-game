@@ -1,6 +1,7 @@
 import type { Socket } from 'socket.io';
-import type { PlayerState } from '@fremen/shared';
+import type { PlayerState, ThumperState } from '@fremen/shared';
 import { GAME_CONSTANTS } from '@fremen/shared';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface RoomPlayer {
   socket: Socket;
@@ -9,11 +10,13 @@ export interface RoomPlayer {
   state: PlayerState;
   lastInputSeq: number;
   connectedAt: number;
+  thumperCount: number;
 }
 
 export class Room {
   private players: Map<string, RoomPlayer> = new Map();
   private disconnectedPlayers: Map<string, { state: PlayerState; disconnectedAt: number }> = new Map();
+  private thumpers: Map<string, ThumperState> = new Map();
   public roomId: string;
 
   constructor(roomId: string) {
@@ -42,6 +45,7 @@ export class Room {
       state: initialState,
       lastInputSeq: 0,
       connectedAt: Date.now(),
+      thumperCount: 3,
     });
 
     this.disconnectedPlayers.delete(playerId);
@@ -90,5 +94,45 @@ export class Room {
         console.log(`Cleaned up disconnected player ${playerId}`);
       }
     }
+  }
+
+  deployThumper(playerId: string): boolean {
+    const player = this.players.get(playerId);
+    if (!player || player.thumperCount <= 0) {
+      return false;
+    }
+
+    const thumperId = uuidv4();
+    const thumper: ThumperState = {
+      id: thumperId,
+      position: { ...player.state.position },
+      active: true,
+      expiresAt: Date.now() + GAME_CONSTANTS.THUMPER_DURATION,
+    };
+
+    this.thumpers.set(thumperId, thumper);
+    player.thumperCount--;
+    
+    console.log(`Player ${player.username} deployed thumper ${thumperId} at`, thumper.position);
+    return true;
+  }
+
+  updateThumpers() {
+    const now = Date.now();
+    
+    for (const [id, thumper] of this.thumpers) {
+      if (now >= thumper.expiresAt) {
+        this.thumpers.delete(id);
+        console.log(`Thumper ${id} expired`);
+      }
+    }
+  }
+
+  getThumpers(): ThumperState[] {
+    return Array.from(this.thumpers.values());
+  }
+
+  getActiveThumpers(): ThumperState[] {
+    return Array.from(this.thumpers.values()).filter(t => t.active);
   }
 }

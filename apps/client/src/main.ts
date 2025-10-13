@@ -26,10 +26,12 @@ const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
 const network = new NetworkManager(serverUrl);
 
 import { Worm } from './entities/Worm';
+import { Thumper } from './entities/Thumper';
 
 let localPlayerId: string | null = null;
 const players = new Map<string, Player>();
 const worms = new Map<string, Worm>();
+const thumpers = new Map<string, Thumper>();
 
 network.onWelcome((data) => {
   localPlayerId = data.playerId;

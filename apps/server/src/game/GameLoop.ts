@@ -66,11 +66,22 @@ export class GameLoop {
     }
 
     this.wormAI.update(deltaTime);
+    
+    this.room.updateThumpers();
+    
+    const activeThumpers = this.room.getActiveThumpers();
+    for (const thumper of activeThumpers) {
+      const nearestWormId = this.wormAI.findNearestWorm(thumper.position);
+      if (nearestWormId) {
+        this.wormAI.setWormTarget(nearestWormId, thumper.position);
+      }
+    }
   }
 
   private broadcastState() {
     const players = this.room.getAllPlayers();
     const worms = this.wormAI.getWorms();
+    const thumpers = this.room.getThumpers();
     
     for (const player of players) {
       const stateMessage = {
@@ -79,7 +90,7 @@ export class GameLoop {
         lastProcessedInputSeq: player.lastInputSeq,
         players: players.map(p => p.state),
         worms,
-        thumpers: [],
+        thumpers,
       };
       
       player.socket.emit('state', stateMessage);
