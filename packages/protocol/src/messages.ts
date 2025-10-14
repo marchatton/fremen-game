@@ -13,6 +13,10 @@ export interface C_INPUT {
     type: 'deployThumper' | 'mount' | 'dismount';
     target?: string;
   };
+  wormControl?: {
+    direction: number;
+    speedIntent: number;
+  };
 }
 
 export interface S_WELCOME {
