@@ -96,4 +96,68 @@ export class GameLoop {
       player.socket.emit('state', stateMessage);
     }
   }
+
+  handleMountAttempt(playerId: string, wormId: string): { success: boolean; reason?: string } {
+    const player = this.room.getPlayer(playerId);
+    if (!player) {
+      return { success: false, reason: 'Player not found' };
+    }
+
+    if (player.state.state === PlayerStateEnum.RIDING) {
+      return { success: false, reason: 'Already mounted' };
+    }
+
+    const worm = this.wormAI.getWorm(wormId);
+    if (!worm) {
+      return { success: false, reason: 'Worm not found' };
+    }
+
+    const head = worm.controlPoints[0];
+    const distance = Math.sqrt(
+      (player.state.position.x - head.x) ** 2 +
+      (player.state.position.z - head.z) ** 2
+    );
+
+    if (distance > GAME_CONSTANTS.WORM_MOUNT_DISTANCE) {
+      return { success: false, reason: 'Too far from worm' };
+    }
+
+    const mounted = this.wormAI.mountWorm(wormId, playerId);
+    if (!mounted) {
+      return { success: false, reason: 'Worm not available' };
+    }
+
+    player.state.state = PlayerStateEnum.RIDING;
+    player.state.ridingWormId = wormId;
+    player.state.velocity = { x: 0, y: 0, z: 0 };
+
+    return { success: true };
+  }
+
+  handleDismount(playerId: string): { success: boolean; reason?: string } {
+    const player = this.room.getPlayer(playerId);
+    if (!player) {
+      return { success: false, reason: 'Player not found' };
+    }
+
+    if (player.state.state !== PlayerStateEnum.RIDING || !player.state.ridingWormId) {
+      return { success: false, reason: 'Not mounted' };
+    }
+
+    const worm = this.wormAI.getWorm(player.state.ridingWormId);
+    if (worm) {
+      const head = worm.controlPoints[0];
+      player.state.position = {
+        x: head.x + 3,
+        y: head.y + 1,
+        z: head.z,
+      };
+    }
+
+    this.wormAI.dismountWorm(player.state.ridingWormId);
+    player.state.state = PlayerStateEnum.ACTIVE;
+    player.state.ridingWormId = undefined;
+
+    return { success: true };
+  }
 }

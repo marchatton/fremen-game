@@ -10,7 +10,8 @@ export interface C_INPUT {
   };
   rotation: number;
   action?: {
-    type: 'deployThumper';
+    type: 'deployThumper' | 'mount' | 'dismount';
+    target?: string;
   };
 }
 

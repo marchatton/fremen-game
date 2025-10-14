@@ -106,6 +106,18 @@ io.on('connection', (socket) => {
       return;
     }
 
+    if (data.action?.type === 'mount' && data.action.target) {
+      const result = gameLoop.handleMountAttempt(playerId, data.action.target);
+      socket.emit('mountResult', result);
+      return;
+    }
+
+    if (data.action?.type === 'dismount') {
+      const result = gameLoop.handleDismount(playerId);
+      socket.emit('dismountResult', result);
+      return;
+    }
+
     const { movement, rotation } = data;
     const speed = GAME_CONSTANTS.PLAYER_MAX_SPEED;
     

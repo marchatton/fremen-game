@@ -1,4 +1,4 @@
-import { GAME_CONSTANTS } from '@fremen/shared';
+import { GAME_CONSTANTS, TerrainGenerator } from '@fremen/shared';
 import { Renderer } from './core/Renderer';
 import { CameraController } from './core/Camera';
 import { InputManager } from './core/InputManager';
@@ -45,6 +45,8 @@ network.onWelcome((data) => {
   
   terrainManager = new TerrainManager(scene, data.seed);
   terrainManager.update(0, 0);
+  
+  heightSampler = new TerrainGenerator({ seed: data.seed });
 });
 
 network.onChat((data) => {
@@ -71,9 +73,19 @@ network.onState((data) => {
         5,
         0.016
       );
+      
+      if (heightSampler) {
+        reconciledPosition.y = heightSampler.getHeight(reconciledPosition.x, reconciledPosition.z) + 1;
+      }
+      
       player.setPosition(reconciledPosition.x, reconciledPosition.y, reconciledPosition.z);
     } else {
-      player.setPosition(playerState.position.x, playerState.position.y, playerState.position.z);
+      const p = player.getPosition();
+      player.setPosition(
+        p.x + (playerState.position.x - p.x) * 0.5,
+        p.y + (playerState.position.y - p.y) * 0.5,
+        p.z + (playerState.position.z - p.z) * 0.5
+      );
     }
     
     player.setRotation(playerState.rotation);
@@ -141,6 +153,7 @@ network.connect().catch(console.error);
 import { TerrainManager } from './terrain/TerrainManager';
 
 let terrainManager: TerrainManager | null = null;
+let heightSampler: TerrainGenerator | null = null;
 
 let lastTime = performance.now();
 
@@ -179,6 +192,11 @@ function animate() {
         if (movement.forward !== 0 || movement.right !== 0) {
           predictedPos.x += dx * cos - dz * sin;
           predictedPos.z += dx * sin + dz * cos;
+        }
+        
+        if (heightSampler) {
+          const groundY = heightSampler.getHeight(predictedPos.x, predictedPos.z) + 1;
+          predictedPos.y = groundY;
         }
         
         const seq = network.sendInput(movement, rotation, shouldDeployThumper);

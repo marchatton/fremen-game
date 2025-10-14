@@ -5,11 +5,13 @@ export class CameraController {
   private camera: THREE.PerspectiveCamera;
   private orbitControls: OrbitControls;
   private target: THREE.Vector3 = new THREE.Vector3();
+  private smoothedTarget: THREE.Vector3 = new THREE.Vector3();
   private offset: THREE.Vector3 = new THREE.Vector3(0, 5, 10);
   private debugMode = false;
 
   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
+    this.smoothedTarget.copy(this.target);
     this.orbitControls = new OrbitControls(camera, domElement);
     this.orbitControls.enableDamping = true;
     this.orbitControls.dampingFactor = 0.05;
@@ -38,9 +40,10 @@ export class CameraController {
     if (this.debugMode) {
       this.orbitControls.update();
     } else {
-      const targetPosition = this.target.clone().add(this.offset);
+      this.smoothedTarget.lerp(this.target, Math.min(1, deltaTime * 10));
+      const targetPosition = this.smoothedTarget.clone().add(this.offset);
       this.camera.position.lerp(targetPosition, deltaTime * 5);
-      this.camera.lookAt(this.target);
+      this.camera.lookAt(this.smoothedTarget);
     }
   }
 

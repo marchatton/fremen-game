@@ -1,4 +1,5 @@
 import type { Vector3, WormState } from '@fremen/shared';
+import { WormAIState, GAME_CONSTANTS } from '@fremen/shared';
 
 export class WormAI {
   private worms: Map<string, WormState> = new Map();
@@ -9,10 +10,14 @@ export class WormAI {
   }
 
   private spawnWorm(id: string, startPosition: Vector3) {
+    const initialHeading = Math.random() * Math.PI * 2;
     const worm: WormState = {
       id,
       controlPoints: this.generateInitialControlPoints(startPosition),
       speed: 15,
+      aiState: WormAIState.PATROLLING,
+      health: GAME_CONSTANTS.WORM_INITIAL_HEALTH,
+      heading: initialHeading,
     };
     this.worms.set(id, worm);
     this.setRandomPatrolTarget(id);
@@ -53,7 +58,11 @@ export class WormAI {
 
   update(deltaTime: number) {
     for (const [wormId, worm] of this.worms) {
-      const target = this.patrolTargets.get(wormId);
+      if (worm.aiState === WormAIState.RIDDEN_BY) {
+        continue;
+      }
+
+      const target = worm.targetPosition || this.patrolTargets.get(wormId);
       if (!target) continue;
 
       const head = worm.controlPoints[0];
@@ -61,13 +70,26 @@ export class WormAI {
       const dz = target.z - head.z;
       const distanceToTarget = Math.sqrt(dx * dx + dz * dz);
 
-      if (distanceToTarget < 20) {
-        this.setRandomPatrolTarget(wormId);
-        continue;
+      if (worm.aiState === WormAIState.APPROACHING_THUMPER) {
+        if (distanceToTarget < GAME_CONSTANTS.WORM_APPROACH_SLOW_DISTANCE) {
+          worm.speed = Math.max(GAME_CONSTANTS.WORM_MIN_SPEED, worm.speed * 0.95);
+        }
+        
+        if (distanceToTarget < 5) {
+          worm.speed = GAME_CONSTANTS.WORM_MIN_SPEED;
+        }
+      } else {
+        if (distanceToTarget < 20) {
+          this.setRandomPatrolTarget(wormId);
+          worm.aiState = WormAIState.PATROLLING;
+          continue;
+        }
       }
 
       const dirX = dx / distanceToTarget;
       const dirZ = dz / distanceToTarget;
+
+      worm.heading = Math.atan2(dirX, dirZ);
 
       const newHead: Vector3 = {
         x: head.x + dirX * worm.speed * deltaTime,
@@ -89,10 +111,39 @@ export class WormAI {
 
   setWormTarget(wormId: string, target: Vector3) {
     const worm = this.worms.get(wormId);
-    if (worm) {
+    if (worm && worm.aiState !== WormAIState.RIDDEN_BY) {
       worm.targetPosition = target;
+      worm.aiState = WormAIState.APPROACHING_THUMPER;
       this.patrolTargets.set(wormId, target);
     }
+  }
+
+  mountWorm(wormId: string, playerId: string): boolean {
+    const worm = this.worms.get(wormId);
+    if (!worm || worm.aiState === WormAIState.RIDDEN_BY) {
+      return false;
+    }
+
+    worm.aiState = WormAIState.RIDDEN_BY;
+    worm.riderId = playerId;
+    worm.speed = 15;
+    console.log(`Player ${playerId} mounted worm ${wormId}`);
+    return true;
+  }
+
+  dismountWorm(wormId: string): boolean {
+    const worm = this.worms.get(wormId);
+    if (!worm) return false;
+
+    worm.aiState = WormAIState.PATROLLING;
+    worm.riderId = undefined;
+    this.setRandomPatrolTarget(wormId);
+    console.log(`Worm ${wormId} dismounted, returning to patrol`);
+    return true;
+  }
+
+  getWorm(wormId: string): WormState | undefined {
+    return this.worms.get(wormId);
   }
 
   findNearestWorm(position: Vector3): string | null {

@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io';
 import type { PlayerState, ThumperState } from '@fremen/shared';
-import { GAME_CONSTANTS } from '@fremen/shared';
+import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface RoomPlayer {
@@ -36,6 +36,7 @@ export class Room {
           position: { x: 0, y: 1, z: 0 },
           rotation: 0,
           velocity: { x: 0, y: 0, z: 0 },
+          state: PlayerStateEnum.ACTIVE,
         };
 
     this.players.set(playerId, {

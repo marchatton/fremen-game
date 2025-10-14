@@ -46,20 +46,19 @@ export class PredictionManager {
   ): Vector3 {
     const unprocessed = this.inputHistory.filter((input) => input.seq > lastProcessedSeq);
 
-    const error = Math.sqrt(
+    const planarError = Math.sqrt(
       (serverPosition.x - currentPosition.x) ** 2 +
-      (serverPosition.y - currentPosition.y) ** 2 +
       (serverPosition.z - currentPosition.z) ** 2
     );
 
-    if (error > 1) {
-      console.warn(`Large position correction: ${error.toFixed(2)}m`);
+    if (planarError > 1) {
+      console.warn(`Large position correction: ${planarError.toFixed(2)}m`);
     }
 
-    if (error < 0.5) {
+    if (planarError < 0.5) {
       return {
         x: currentPosition.x + (serverPosition.x - currentPosition.x) * 0.1,
-        y: serverPosition.y,
+        y: currentPosition.y + (serverPosition.y - currentPosition.y) * 0.1,
         z: currentPosition.z + (serverPosition.z - currentPosition.z) * 0.1,
       };
     }
