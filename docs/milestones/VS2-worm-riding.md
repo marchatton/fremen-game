@@ -83,14 +83,14 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Animations play correctly, blend smoothly, sync across clients
 
 ### 8. Third-Person Camera
-- [ ] Camera follows player/worm with spring arm
+- [x] Camera follows player/worm with spring arm
 - [ ] Collision detection (raycast from target to camera)
-- [ ] Smooth FOV changes (narrow when mounted, wider on foot)
-- [ ] Vertical offset: higher when riding worm
+- [x] Smooth FOV changes (narrow when mounted, wider on foot)
+- [x] Vertical offset: higher when riding worm
 - [ ] Mouse/touch controls: orbit around player
-- [ ] Smooth transitions between foot/mounted modes
+- [x] Smooth transitions between foot/mounted modes
 
-**Tests**: Camera doesn't clip terrain, smooth transitions, controllable
+**Tests**: Camera doesn't clip terrain, smooth transitions, controllable (partial ✅)
 
 ### 9. Enhanced Prediction/Reconciliation
 - [ ] Worm steering uses custom prediction (heading/speed only)
@@ -102,15 +102,16 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Worm control feels responsive, corrections barely noticeable at 150ms RTT
 
 ### 10. UI/UX Polish
-- [ ] HUD: Speed indicator while riding
-- [ ] HUD: Worm health bar (when mounted)
-- [ ] HUD: Objective tracker with waypoint arrow
-- [ ] HUD: Timer for timed objectives
-- [ ] Interaction prompts: "Press E to Mount/Dismount"
+- [x] HUD: Speed indicator while riding
+- [x] HUD: Worm health bar (when mounted)
+- [x] HUD: Objective tracker with waypoint arrow
+- [x] HUD: Timer for timed objectives
+- [x] Interaction prompts: "Press E to Mount/Dismount"
+- [x] Visual feedback: 3D objective marker with radius ring
 - [ ] Visual feedback: thumper placement preview (ghost model)
 - [ ] Sound: Mount/dismount effects, worm roar on successful mount
 
-**Tests**: All UI elements visible and functional, sounds play correctly
+**Tests**: All UI elements visible and functional, sounds play correctly (partial ✅)
 
 ### 11. Tutorial Flow
 - [ ] First-time player tutorial: 5 steps with UI prompts

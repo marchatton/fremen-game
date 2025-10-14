@@ -7,6 +7,7 @@ import { FPSCounter } from './ui/FPSCounter';
 import { ChatUI } from './ui/ChatUI';
 import { InteractionPrompt } from './ui/InteractionPrompt';
 import { ObjectiveTracker } from './ui/ObjectiveTracker';
+import { RidingHUD } from './ui/RidingHUD';
 import { NetworkManager } from './networking/NetworkManager';
 import { PredictionManager } from './core/PredictionManager';
 import * as THREE from 'three';
@@ -26,6 +27,7 @@ const fpsCounter = new FPSCounter();
 const chatUI = new ChatUI();
 const interactionPrompt = new InteractionPrompt();
 const objectiveTracker = new ObjectiveTracker();
+const ridingHUD = new RidingHUD();
 const predictionManager = new PredictionManager();
 
 chatUI.onSend((message) => {
@@ -37,11 +39,13 @@ const network = new NetworkManager(serverUrl);
 
 import { Worm } from './entities/Worm';
 import { Thumper } from './entities/Thumper';
+import { ObjectiveMarker } from './entities/ObjectiveMarker';
 import { PlayerStateEnum } from '@fremen/shared';
 
 let localPlayerId: string | null = null;
 let localPlayerState: PlayerStateEnum = PlayerStateEnum.ACTIVE;
 let currentObjective: any = null;
+let objectiveMarker: ObjectiveMarker | null = null;
 const players = new Map<string, Player>();
 const worms = new Map<string, Worm>();
 const wormStates = new Map<string, any>();
@@ -65,7 +69,29 @@ network.onState((data) => {
   if (data.objective) {
     if (currentObjective?.status === 'ACTIVE' && data.objective.status === 'COMPLETED') {
       objectiveTracker.showCompletion();
+      if (objectiveMarker) {
+        scene.remove(objectiveMarker.getGroup());
+        objectiveMarker.dispose();
+        objectiveMarker = null;
+      }
     }
+    
+    if (data.objective.status === 'ACTIVE' && (!currentObjective || currentObjective.id !== data.objective.id)) {
+      if (objectiveMarker) {
+        scene.remove(objectiveMarker.getGroup());
+        objectiveMarker.dispose();
+      }
+      
+      const pos = new THREE.Vector3(
+        data.objective.targetPosition.x,
+        data.objective.targetPosition.y,
+        data.objective.targetPosition.z
+      );
+      objectiveMarker = new ObjectiveMarker(pos, data.objective.radius);
+      scene.add(objectiveMarker.getGroup());
+      console.log('Spawned objective marker at', pos);
+    }
+    
     currentObjective = data.objective;
   }
 
@@ -81,7 +107,13 @@ network.onState((data) => {
     }
 
     if (playerState.id === localPlayerId) {
+      const wasRiding = localPlayerState === PlayerStateEnum.RIDING;
       localPlayerState = playerState.state;
+      const isRiding = localPlayerState === PlayerStateEnum.RIDING;
+      
+      if (wasRiding !== isRiding) {
+        cameraController.setRidingMode(isRiding);
+      }
     }
 
     if (playerState.id === localPlayerId && data.lastProcessedInputSeq !== undefined) {
@@ -291,6 +323,10 @@ function animate() {
     }
   }
 
+  if (objectiveMarker) {
+    objectiveMarker.update(deltaTime);
+  }
+
   cameraController.update(deltaTime);
   fpsCounter.update();
 
@@ -299,6 +335,20 @@ function animate() {
     if (localPlayer) {
       objectiveTracker.update(currentObjective, localPlayer.getPosition());
     }
+  }
+
+  if (localPlayerState === PlayerStateEnum.RIDING && localPlayerId) {
+    const localPlayer = players.get(localPlayerId);
+    if (localPlayer) {
+      const playerData = Array.from(wormStates.values()).find(w => w.riderId === localPlayerId);
+      if (playerData) {
+        ridingHUD.show();
+        ridingHUD.updateSpeed(playerData.speed);
+        ridingHUD.updateHealth(playerData.health, GAME_CONSTANTS.WORM_INITIAL_HEALTH);
+      }
+    }
+  } else {
+    ridingHUD.hide();
   }
 
   renderer.render();
