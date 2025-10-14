@@ -6,7 +6,7 @@ export class CameraController {
   private orbitControls: OrbitControls;
   private target: THREE.Vector3 = new THREE.Vector3();
   private offset: THREE.Vector3 = new THREE.Vector3(0, 5, 10);
-  private debugMode = true;
+  private debugMode = false;
 
   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
