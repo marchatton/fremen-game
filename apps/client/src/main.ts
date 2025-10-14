@@ -163,7 +163,7 @@ network.onState((data) => {
       console.log(`Added worm: ${wormState.id}`);
     }
 
-    worm.updateFromState(wormState);
+    worm.updateFromState(wormState, deltaTime);
   }
 
   const currentWormIds = new Set(data.worms.map((w) => w.id));

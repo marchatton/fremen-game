@@ -33,14 +33,23 @@ export class Worm {
     }
   }
 
-  updateFromState(state: WormState) {
+  updateFromState(state: WormState, deltaTime = 0.016) {
     if (state.controlPoints.length < this.segments.length) {
       return;
     }
 
+    this.animationTime += deltaTime * state.speed * 0.5;
+
     for (let i = 0; i < this.segments.length; i++) {
       const point = state.controlPoints[i];
-      this.segments[i].position.set(point.x, point.y + 1.5, point.z);
+      
+      const undulationOffset = Math.sin(this.animationTime - i * 0.3) * 0.3;
+      
+      this.segments[i].position.set(
+        point.x,
+        point.y + 1.5 + undulationOffset,
+        point.z
+      );
 
       if (i > 0) {
         const prevPoint = state.controlPoints[i - 1];
@@ -48,7 +57,14 @@ export class Worm {
         const dz = point.z - prevPoint.z;
         const angle = Math.atan2(dx, dz);
         this.segments[i].rotation.y = angle;
+        
+        const tiltAngle = undulationOffset * 0.2;
+        this.segments[i].rotation.z = tiltAngle;
       }
+    }
+
+    if (state.controlPoints.length > 0 && state.heading !== undefined) {
+      this.segments[0].rotation.y = state.heading;
     }
   }
 
