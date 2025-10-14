@@ -5,6 +5,7 @@ export class InputManager {
   private mouseDeltaX = 0;
   private mouseDeltaY = 0;
   private isPointerLocked = false;
+  private thumperRequested = false;
 
   constructor() {
     this.setupEventListeners();
@@ -13,6 +14,10 @@ export class InputManager {
   private setupEventListeners() {
     window.addEventListener('keydown', (e) => {
       this.keys.set(e.code, true);
+      
+      if (e.code === 'KeyE' && !this.thumperRequested) {
+        this.thumperRequested = true;
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -68,5 +73,13 @@ export class InputManager {
 
   isPointerLockActive(): boolean {
     return this.isPointerLocked;
+  }
+
+  shouldDeployThumper(): boolean {
+    if (this.thumperRequested) {
+      this.thumperRequested = false;
+      return true;
+    }
+    return false;
   }
 }

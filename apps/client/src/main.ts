@@ -22,7 +22,7 @@ const inputManager = new InputManager();
 const fpsCounter = new FPSCounter();
 const predictionManager = new PredictionManager();
 
-const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+const serverUrl = 'http://localhost:3000';
 const network = new NetworkManager(serverUrl);
 
 import { Worm } from './entities/Worm';
@@ -69,7 +69,7 @@ network.onState((data) => {
     player.setRotation(playerState.rotation);
   }
 
-  const currentPlayerIds = new Set(data.players.map(p => p.id));
+  const currentPlayerIds = new Set(data.players.map((p) => p.id));
   for (const [id, player] of players) {
     if (!currentPlayerIds.has(id)) {
       scene.remove(player.getMesh());
@@ -91,13 +91,37 @@ network.onState((data) => {
     worm.updateFromState(wormState);
   }
 
-  const currentWormIds = new Set(data.worms.map(w => w.id));
+  const currentWormIds = new Set(data.worms.map((w) => w.id));
   for (const [id, worm] of worms) {
     if (!currentWormIds.has(id)) {
       scene.remove(worm.getGroup());
       worm.dispose();
       worms.delete(id);
       console.log(`Removed worm: ${id}`);
+    }
+  }
+
+  for (const thumperState of data.thumpers) {
+    let thumper = thumpers.get(thumperState.id);
+    
+    if (!thumper) {
+      const pos = new THREE.Vector3(thumperState.position.x, thumperState.position.y, thumperState.position.z);
+      thumper = new Thumper(thumperState.id, pos);
+      thumpers.set(thumperState.id, thumper);
+      scene.add(thumper.getGroup());
+      console.log(`Added thumper: ${thumperState.id}`);
+    }
+
+    thumper.update(0.016, thumperState);
+  }
+
+  const currentThumperIds = new Set(data.thumpers.map((t) => t.id));
+  for (const [id, thumper] of thumpers) {
+    if (!currentThumperIds.has(id)) {
+      scene.remove(thumper.getGroup());
+      thumper.dispose();
+      thumpers.delete(id);
+      console.log(`Removed thumper: ${id}`);
     }
   }
 });
@@ -131,7 +155,9 @@ function animate() {
         localPlayer.setRotation(rotation);
       }
 
-      if (network.isConnected() && (movement.forward !== 0 || movement.right !== 0)) {
+      const shouldDeployThumper = inputManager.shouldDeployThumper();
+
+      if (network.isConnected() && ((movement.forward !== 0 || movement.right !== 0) || shouldDeployThumper)) {
         const speed = 5;
         const dx = movement.right * speed * deltaTime;
         const dz = -movement.forward * speed * deltaTime;
@@ -140,10 +166,12 @@ function animate() {
         const sin = Math.sin(rotation);
         
         const predictedPos = localPlayer.getPosition();
-        predictedPos.x += dx * cos - dz * sin;
-        predictedPos.z += dx * sin + dz * cos;
+        if (movement.forward !== 0 || movement.right !== 0) {
+          predictedPos.x += dx * cos - dz * sin;
+          predictedPos.z += dx * sin + dz * cos;
+        }
         
-        const seq = network.sendInput(movement, rotation);
+        const seq = network.sendInput(movement, rotation, shouldDeployThumper);
         predictionManager.addInput(seq, movement, rotation, {
           x: predictedPos.x,
           y: predictedPos.y,

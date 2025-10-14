@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { S_WELCOME, S_STATE, ClientMessage } from '@fremen/protocol';
+import type { S_WELCOME, S_STATE } from '@fremen/protocol';
 
 export class NetworkManager {
   private socket: Socket | null = null;
@@ -80,7 +80,7 @@ export class NetworkManager {
     }, 2000);
   }
 
-  sendInput(movement: { forward: number; right: number }, rotation: number): number {
+  sendInput(movement: { forward: number; right: number }, rotation: number, deployThumper = false): number {
     if (!this.socket || !this.connected) return this.inputSeq;
 
     this.inputSeq++;
@@ -90,6 +90,7 @@ export class NetworkManager {
       timestamp: Date.now(),
       movement,
       rotation,
+      action: deployThumper ? { type: 'deployThumper' as const } : undefined,
     };
 
     this.socket.emit('input', inputMessage);
