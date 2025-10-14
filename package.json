@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "build": "pnpm --parallel build",
-    "dev": "pnpm --parallel dev",
+    "dev": "pnpm --parallel --filter @fremen/server --filter @fremen/client dev",
+    "dev:server": "pnpm --filter @fremen/server dev",
+    "dev:client": "pnpm --filter @fremen/client dev",
     "test": "pnpm --parallel test",
     "lint": "pnpm --parallel lint",
     "typecheck": "pnpm --parallel typecheck"
