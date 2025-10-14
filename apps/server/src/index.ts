@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import express from 'express';
+import cors from 'cors';
 import { GAME_CONSTANTS } from '@fremen/shared';
 import { generateToken, verifyToken } from './auth/jwt';
 import { Room } from './game/Room';
@@ -10,6 +11,7 @@ import { RateLimiter } from './game/RateLimiter';
 const PORT = process.env.PORT || 3000;
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const httpServer = createServer(app);
