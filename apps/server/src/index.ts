@@ -25,6 +25,20 @@ const io = new Server(httpServer, {
 console.log('Fremen Game - Server Starting');
 console.log('Game Constants:', GAME_CONSTANTS);
 
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Fremen Game Server',
+    version: '0.1.0',
+    status: 'running',
+    players: mainRoom.getPlayerCount(),
+    endpoints: {
+      auth: '/auth/token',
+      websocket: 'ws://localhost:3000',
+    },
+    client: 'http://localhost:5173',
+  });
+});
+
 app.get('/auth/token', (req, res) => {
   const token = generateToken();
   res.json({ token });
