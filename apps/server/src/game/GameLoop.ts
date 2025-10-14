@@ -53,16 +53,25 @@ export class GameLoop {
     const players = this.room.getAllPlayers();
     
     for (const player of players) {
-      if (!this.physics.validatePlayerSpeed(player.state.velocity)) {
-        console.warn(`Speed hack detected for player ${player.playerId}`);
-        player.state.velocity = this.physics.clampVelocity(player.state.velocity);
-      }
+      if (player.state.state === PlayerStateEnum.RIDING && player.state.ridingWormId) {
+        const worm = this.wormAI.getWorm(player.state.ridingWormId);
+        if (worm && worm.controlPoints.length >= 3) {
+          const segment = worm.controlPoints[2];
+          player.state.position = { ...segment };
+          player.state.velocity = { x: 0, y: 0, z: 0 };
+        }
+      } else {
+        if (!this.physics.validatePlayerSpeed(player.state.velocity)) {
+          console.warn(`Speed hack detected for player ${player.playerId}`);
+          player.state.velocity = this.physics.clampVelocity(player.state.velocity);
+        }
 
-      player.state.position = this.physics.validatePlayerPosition(
-        player.state.position,
-        player.state.velocity,
-        deltaTime
-      );
+        player.state.position = this.physics.validatePlayerPosition(
+          player.state.position,
+          player.state.velocity,
+          deltaTime
+        );
+      }
     }
 
     this.wormAI.update(deltaTime);

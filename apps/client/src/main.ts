@@ -5,6 +5,7 @@ import { InputManager } from './core/InputManager';
 import { Player } from './entities/Player';
 import { FPSCounter } from './ui/FPSCounter';
 import { ChatUI } from './ui/ChatUI';
+import { InteractionPrompt } from './ui/InteractionPrompt';
 import { NetworkManager } from './networking/NetworkManager';
 import { PredictionManager } from './core/PredictionManager';
 import * as THREE from 'three';
@@ -22,6 +23,7 @@ const cameraController = new CameraController(camera, canvas);
 const inputManager = new InputManager();
 const fpsCounter = new FPSCounter();
 const chatUI = new ChatUI();
+const interactionPrompt = new InteractionPrompt();
 const predictionManager = new PredictionManager();
 
 chatUI.onSend((message) => {
@@ -33,10 +35,13 @@ const network = new NetworkManager(serverUrl);
 
 import { Worm } from './entities/Worm';
 import { Thumper } from './entities/Thumper';
+import { PlayerStateEnum } from '@fremen/shared';
 
 let localPlayerId: string | null = null;
+let localPlayerState: PlayerStateEnum = PlayerStateEnum.ACTIVE;
 const players = new Map<string, Player>();
 const worms = new Map<string, Worm>();
+const wormStates = new Map<string, any>();
 const thumpers = new Map<string, Thumper>();
 
 network.onWelcome((data) => {
@@ -63,6 +68,10 @@ network.onState((data) => {
       players.set(playerState.id, player);
       scene.add(player.getMesh());
       console.log(`Added player: ${playerState.id}`);
+    }
+
+    if (playerState.id === localPlayerId) {
+      localPlayerState = playerState.state;
     }
 
     if (playerState.id === localPlayerId && data.lastProcessedInputSeq !== undefined) {
@@ -101,6 +110,8 @@ network.onState((data) => {
   }
 
   for (const wormState of data.worms) {
+    wormStates.set(wormState.id, wormState);
+    
     let worm = worms.get(wormState.id);
     
     if (!worm) {
@@ -167,7 +178,44 @@ function animate() {
   const movement = inputManager.getMovement();
   const mouseDelta = inputManager.getMouseDelta();
 
-  if (!cameraController.isDebugMode() && localPlayerId) {
+  let nearestMountableWorm: string | null = null;
+  if (localPlayerId && localPlayerState === PlayerStateEnum.ACTIVE) {
+    const localPlayer = players.get(localPlayerId);
+    if (localPlayer) {
+      let closestDist = GAME_CONSTANTS.WORM_MOUNT_DISTANCE;
+      
+      for (const [wormId, wormState] of wormStates) {
+        if (wormState.aiState !== 'RIDDEN_BY' && wormState.controlPoints.length > 0) {
+          const head = wormState.controlPoints[0];
+          const dist = Math.sqrt(
+            (localPlayer.getPosition().x - head.x) ** 2 +
+            (localPlayer.getPosition().z - head.z) ** 2
+          );
+          
+          if (dist < closestDist) {
+            closestDist = dist;
+            nearestMountableWorm = wormId;
+          }
+        }
+      }
+    }
+  }
+
+  if (nearestMountableWorm) {
+    interactionPrompt.show('Press E to Mount');
+    if (inputManager.shouldMount()) {
+      network.sendMountAttempt(nearestMountableWorm);
+    }
+  } else if (localPlayerState === PlayerStateEnum.RIDING) {
+    interactionPrompt.show('Press E to Dismount');
+    if (inputManager.shouldMount()) {
+      network.sendDismount();
+    }
+  } else {
+    interactionPrompt.hide();
+  }
+
+  if (!cameraController.isDebugMode() && localPlayerId && localPlayerState === PlayerStateEnum.ACTIVE) {
     const localPlayer = players.get(localPlayerId);
     if (localPlayer) {
       let rotation = localPlayer.getMesh().rotation.y;

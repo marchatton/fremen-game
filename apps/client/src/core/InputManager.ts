@@ -6,6 +6,7 @@ export class InputManager {
   private mouseDeltaY = 0;
   private isPointerLocked = false;
   private thumperRequested = false;
+  private mountRequested = false;
 
   constructor() {
     this.setupEventListeners();
@@ -15,8 +16,10 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys.set(e.code, true);
       
-      if (e.code === 'KeyE' && !this.thumperRequested) {
-        this.thumperRequested = true;
+      if (e.code === 'KeyE') {
+        if (!this.thumperRequested && !this.mountRequested) {
+          this.mountRequested = true;
+        }
       }
     });
 
@@ -81,5 +84,21 @@ export class InputManager {
       return true;
     }
     return false;
+  }
+
+  shouldMount(): boolean {
+    if (this.mountRequested) {
+      this.mountRequested = false;
+      return true;
+    }
+    return false;
+  }
+
+  resetMountRequest() {
+    this.mountRequested = false;
+  }
+
+  setThumperRequest(value: boolean) {
+    this.thumperRequested = value;
   }
 }

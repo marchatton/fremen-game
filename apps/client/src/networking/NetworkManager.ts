@@ -127,6 +127,38 @@ export class NetworkManager {
     this.socket.emit('chat', chatMessage);
   }
 
+  sendMountAttempt(wormId: string) {
+    if (!this.socket || !this.connected) return;
+
+    this.inputSeq++;
+    const inputMessage = {
+      type: 'C_INPUT' as const,
+      seq: this.inputSeq,
+      timestamp: Date.now(),
+      movement: { forward: 0, right: 0 },
+      rotation: 0,
+      action: { type: 'mount' as const, target: wormId },
+    };
+
+    this.socket.emit('input', inputMessage);
+  }
+
+  sendDismount() {
+    if (!this.socket || !this.connected) return;
+
+    this.inputSeq++;
+    const inputMessage = {
+      type: 'C_INPUT' as const,
+      seq: this.inputSeq,
+      timestamp: Date.now(),
+      movement: { forward: 0, right: 0 },
+      rotation: 0,
+      action: { type: 'dismount' as const },
+    };
+
+    this.socket.emit('input', inputMessage);
+  }
+
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
