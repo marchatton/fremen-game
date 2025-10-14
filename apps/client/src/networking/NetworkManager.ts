@@ -87,7 +87,7 @@ export class NetworkManager {
     }, 2000);
   }
 
-  sendInput(movement: { forward: number; right: number }, rotation: number, deployThumper = false): number {
+  sendInput(movement: { forward: number; right: number }, rotation: number, deployThumper = false, wormControl?: { direction: number; speedIntent: number }): number {
     if (!this.socket || !this.connected) return this.inputSeq;
 
     this.inputSeq++;
@@ -98,6 +98,7 @@ export class NetworkManager {
       movement,
       rotation,
       action: deployThumper ? { type: 'deployThumper' as const } : undefined,
+      wormControl,
     };
 
     this.socket.emit('input', inputMessage);

@@ -146,6 +146,34 @@ export class WormAI {
     return this.worms.get(wormId);
   }
 
+  steerWorm(wormId: string, direction: number, speedIntent: number, deltaTime: number) {
+    const worm = this.worms.get(wormId);
+    if (!worm || worm.aiState !== WormAIState.RIDDEN_BY) return;
+
+    const maxTurnRate = GAME_CONSTANTS.WORM_TURN_RATE * deltaTime;
+    const targetHeadingChange = direction * maxTurnRate;
+    worm.heading += targetHeadingChange;
+
+    const targetSpeed = GAME_CONSTANTS.WORM_MIN_SPEED + 
+      ((speedIntent + 1) / 2) * (GAME_CONSTANTS.WORM_MAX_SPEED - GAME_CONSTANTS.WORM_MIN_SPEED);
+    
+    worm.speed += (targetSpeed - worm.speed) * deltaTime * 2;
+    worm.speed = Math.max(GAME_CONSTANTS.WORM_MIN_SPEED, Math.min(GAME_CONSTANTS.WORM_MAX_SPEED, worm.speed));
+
+    const head = worm.controlPoints[0];
+    const newHead: Vector3 = {
+      x: head.x + Math.sin(worm.heading) * worm.speed * deltaTime,
+      y: 0,
+      z: head.z + Math.cos(worm.heading) * worm.speed * deltaTime,
+    };
+
+    worm.controlPoints.unshift(newHead);
+    
+    if (worm.controlPoints.length > 12) {
+      worm.controlPoints.pop();
+    }
+  }
+
   findNearestWorm(position: Vector3): string | null {
     let nearestId: string | null = null;
     let nearestDist = Infinity;

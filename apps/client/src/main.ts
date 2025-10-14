@@ -6,6 +6,7 @@ import { Player } from './entities/Player';
 import { FPSCounter } from './ui/FPSCounter';
 import { ChatUI } from './ui/ChatUI';
 import { InteractionPrompt } from './ui/InteractionPrompt';
+import { ObjectiveTracker } from './ui/ObjectiveTracker';
 import { NetworkManager } from './networking/NetworkManager';
 import { PredictionManager } from './core/PredictionManager';
 import * as THREE from 'three';
@@ -24,6 +25,7 @@ const inputManager = new InputManager();
 const fpsCounter = new FPSCounter();
 const chatUI = new ChatUI();
 const interactionPrompt = new InteractionPrompt();
+const objectiveTracker = new ObjectiveTracker();
 const predictionManager = new PredictionManager();
 
 chatUI.onSend((message) => {
@@ -39,6 +41,7 @@ import { PlayerStateEnum } from '@fremen/shared';
 
 let localPlayerId: string | null = null;
 let localPlayerState: PlayerStateEnum = PlayerStateEnum.ACTIVE;
+let currentObjective: any = null;
 const players = new Map<string, Player>();
 const worms = new Map<string, Worm>();
 const wormStates = new Map<string, any>();
@@ -59,6 +62,13 @@ network.onChat((data) => {
 });
 
 network.onState((data) => {
+  if (data.objective) {
+    if (currentObjective?.status === 'ACTIVE' && data.objective.status === 'COMPLETED') {
+      objectiveTracker.showCompletion();
+    }
+    currentObjective = data.objective;
+  }
+
   for (const playerState of data.players) {
     let player = players.get(playerState.id);
     
@@ -215,7 +225,25 @@ function animate() {
     interactionPrompt.hide();
   }
 
-  if (!cameraController.isDebugMode() && localPlayerId && localPlayerState === PlayerStateEnum.ACTIVE) {
+  if (!cameraController.isDebugMode() && localPlayerId && localPlayerState === PlayerStateEnum.RIDING) {
+    const localPlayer = players.get(localPlayerId);
+    if (localPlayer && network.isConnected()) {
+      const wormControl = {
+        direction: movement.right,
+        speedIntent: movement.forward,
+      };
+
+      if (movement.forward !== 0 || movement.right !== 0) {
+        network.sendInput({ forward: 0, right: 0 }, 0, false, wormControl);
+      }
+
+      cameraController.setTarget(localPlayer.getPosition());
+
+      if (terrainManager) {
+        terrainManager.update(localPlayer.getPosition().x, localPlayer.getPosition().z);
+      }
+    }
+  } else if (!cameraController.isDebugMode() && localPlayerId && localPlayerState === PlayerStateEnum.ACTIVE) {
     const localPlayer = players.get(localPlayerId);
     if (localPlayer) {
       let rotation = localPlayer.getMesh().rotation.y;
@@ -265,6 +293,14 @@ function animate() {
 
   cameraController.update(deltaTime);
   fpsCounter.update();
+
+  if (currentObjective && localPlayerId) {
+    const localPlayer = players.get(localPlayerId);
+    if (localPlayer) {
+      objectiveTracker.update(currentObjective, localPlayer.getPosition());
+    }
+  }
+
   renderer.render();
 }
 

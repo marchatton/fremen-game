@@ -118,19 +118,30 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const { movement, rotation } = data;
-    const speed = GAME_CONSTANTS.PLAYER_MAX_SPEED;
-    
-    const velocity = {
-      x: movement.right * speed,
-      y: 0,
-      z: -movement.forward * speed,
-    };
+    const player = mainRoom.getPlayer(playerId);
+    if (!player) return;
 
-    mainRoom.updatePlayerState(playerId, {
-      velocity,
-      rotation,
-    });
+    if (data.wormControl && player.state.ridingWormId) {
+      gameLoop.handleWormControl(
+        player.state.ridingWormId,
+        data.wormControl.direction,
+        data.wormControl.speedIntent
+      );
+    } else {
+      const { movement, rotation } = data;
+      const speed = GAME_CONSTANTS.PLAYER_MAX_SPEED;
+      
+      const velocity = {
+        x: movement.right * speed,
+        y: 0,
+        z: -movement.forward * speed,
+      };
+
+      mainRoom.updatePlayerState(playerId, {
+        velocity,
+        rotation,
+      });
+    }
   });
 
   socket.on('chat', (data) => {

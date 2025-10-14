@@ -51,6 +51,8 @@ export class GameLoop {
 
   private updateGameState(deltaTime: number) {
     const players = this.room.getAllPlayers();
+
+    this.wormAI.update(deltaTime);
     
     for (const player of players) {
       if (player.state.state === PlayerStateEnum.RIDING && player.state.ridingWormId) {
@@ -73,8 +75,6 @@ export class GameLoop {
         );
       }
     }
-
-    this.wormAI.update(deltaTime);
     
     this.room.updateThumpers();
     
@@ -85,12 +85,22 @@ export class GameLoop {
         this.wormAI.setWormTarget(nearestWormId, thumper.position);
       }
     }
+
+    this.objectiveManager.update();
+
+    const worms = this.wormAI.getWorms();
+    for (const worm of worms) {
+      if (worm.aiState === 'RIDDEN_BY' && worm.controlPoints.length > 0) {
+        this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
+      }
+    }
   }
 
   private broadcastState() {
     const players = this.room.getAllPlayers();
     const worms = this.wormAI.getWorms();
     const thumpers = this.room.getThumpers();
+    const objective = this.objectiveManager.getActiveObjective();
     
     for (const player of players) {
       const stateMessage = {
@@ -100,6 +110,14 @@ export class GameLoop {
         players: players.map(p => p.state),
         worms,
         thumpers,
+        objective: objective ? {
+          id: objective.id,
+          type: objective.type,
+          targetPosition: objective.targetPosition,
+          radius: objective.radius,
+          timeRemaining: Math.max(0, objective.expiresAt - Date.now()),
+          status: objective.status,
+        } : undefined,
       };
       
       player.socket.emit('state', stateMessage);
@@ -168,5 +186,10 @@ export class GameLoop {
     player.state.ridingWormId = undefined;
 
     return { success: true };
+  }
+
+  handleWormControl(wormId: string, direction: number, speedIntent: number) {
+    const deltaTime = 1 / GAME_CONSTANTS.TICK_RATE;
+    this.wormAI.steerWorm(wormId, direction, speedIntent, deltaTime);
   }
 }

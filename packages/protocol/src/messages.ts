@@ -33,6 +33,14 @@ export interface S_STATE {
   players: PlayerState[];
   worms: WormState[];
   thumpers: ThumperState[];
+  objective?: {
+    id: string;
+    type: string;
+    targetPosition: Vector3;
+    radius: number;
+    timeRemaining: number;
+    status: string;
+  };
 }
 
 export interface S_SNAPSHOT {
