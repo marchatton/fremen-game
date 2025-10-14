@@ -91,7 +91,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('input', (data) => {
-    const player = mainRoom.getPlayer(playerId);
+    let player = mainRoom.getPlayer(playerId);
     if (!player) return;
 
     player.lastInputSeq = data.seq;
@@ -117,9 +117,6 @@ io.on('connection', (socket) => {
       socket.emit('dismountResult', result);
       return;
     }
-
-    const player = mainRoom.getPlayer(playerId);
-    if (!player) return;
 
     if (data.wormControl && player.state.ridingWormId) {
       gameLoop.handleWormControl(

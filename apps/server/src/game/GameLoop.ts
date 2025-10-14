@@ -2,11 +2,13 @@ import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
 import type { Room } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
+import { ObjectiveManager } from './ObjectiveManager';
 
 export class GameLoop {
   private room: Room;
   private physics: Physics;
   private wormAI: WormAI;
+  private objectiveManager: ObjectiveManager;
   private tickCount = 0;
   private lastTickTime = Date.now();
   private intervalId?: NodeJS.Timeout;
@@ -15,6 +17,8 @@ export class GameLoop {
     this.room = room;
     this.physics = new Physics(seed);
     this.wormAI = new WormAI();
+    this.objectiveManager = new ObjectiveManager();
+    this.objectiveManager.spawnRandomObjective();
   }
 
   start() {

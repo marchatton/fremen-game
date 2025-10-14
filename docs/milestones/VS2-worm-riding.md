@@ -9,28 +9,28 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 ## Deliverables
 
 ### 1. Worm Mounting System
-- [ ] Worm AI state: `PATROLLING` → `APPROACHING_THUMPER` (slows near active thumper)
-- [ ] Client detects mountable worm (within 5m, state = `APPROACHING_THUMPER`)
-- [ ] Interaction prompt UI: "Press E to Mount"
-- [ ] `C_INPUT` with `action: { type: "mount", target: wormId }`
-- [ ] Server validation: distance, worm state, player not already mounted
-- [ ] Server sets player state: `RIDING { wormId }`, worm state: `RIDDEN_BY { playerId }`
-- [ ] Client attaches player model to worm's 2nd segment
+- [x] Worm AI state: `PATROLLING` → `APPROACHING_THUMPER` (slows near active thumper)
+- [x] Client detects mountable worm (within 5m, state = `APPROACHING_THUMPER`)
+- [x] Interaction prompt UI: "Press E to Mount"
+- [x] `C_INPUT` with `action: { type: "mount", target: wormId }`
+- [x] Server validation: distance, worm state, player not already mounted
+- [x] Server sets player state: `RIDING { wormId }`, worm state: `RIDDEN_BY { playerId }`
+- [x] Client attaches player model to worm's 2nd segment
 - [ ] Camera switches to "worm riding" mode (follow behind, slightly elevated)
 
-**Tests**: Player can mount worm within window, rejected if too far or wrong state
+**Tests**: Player can mount worm within window, rejected if too far or wrong state ✅
 
 ### 2. Worm Steering Controls
-- [ ] New input mode when `player.state === RIDING`
-- [ ] WASD/analog stick controls worm direction intent
-- [ ] `C_INPUT` includes `wormControl: { direction, speedIntent }`
-- [ ] Server updates worm spline target based on player input
-- [ ] Constrain turn rate (max 45°/second)
-- [ ] Constrain speed (min 5 m/s, max 25 m/s)
-- [ ] W/S adjusts speed, A/D adjusts heading
+- [x] New input mode when `player.state === RIDING`
+- [x] WASD/analog stick controls worm direction intent
+- [x] `C_INPUT` includes `wormControl: { direction, speedIntent }`
+- [x] Server updates worm spline target based on player input
+- [x] Constrain turn rate (max 45°/second)
+- [x] Constrain speed (min 5 m/s, max 25 m/s)
+- [x] W/S adjusts speed, A/D adjusts heading
 - [ ] Camera follows worm's heading smoothly
 
-**Tests**: Worm responds to steering within 100ms, constrained to realistic movement
+**Tests**: Worm responds to steering within 100ms, constrained to realistic movement ✅
 
 ### 3. Advanced Worm Animation
 - [ ] Procedural segment undulation (sine wave perpendicular to movement)
@@ -43,15 +43,15 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Worm looks fluid at all speeds, particles/sound match movement
 
 ### 4. Dismounting System
-- [ ] "Press E to Dismount" prompt while riding
-- [ ] `C_INPUT` with `action: { type: "dismount" }`
-- [ ] Server ejects player 3m to worm's right side
+- [x] "Press E to Dismount" prompt while riding
+- [x] `C_INPUT` with `action: { type: "dismount" }`
+- [x] Server ejects player 3m to worm's right side
 - [ ] Player gets 2s invulnerability after dismount
-- [ ] Worm returns to `PATROLLING` state after 5s cooldown
+- [x] Worm returns to `PATROLLING` state after 5s cooldown
 - [ ] Safe dismount zones: avoid cliffs, water
 - [ ] Emergency dismount on worm death or stuck
 
-**Tests**: Player dismounts safely, invulnerability works, worm becomes available again
+**Tests**: Player dismounts safely, invulnerability works, worm becomes available again (partial ✅)
 
 ### 5. Worm Health & Danger
 - [ ] Worm has health (1000 HP)
@@ -63,14 +63,14 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Worm takes damage from obstacles, death handled gracefully
 
 ### 6. First Objective: Shepherd Worm
-- [ ] Server spawns objective marker at random valid location
-- [ ] Objective type: "Shepherd worm to marker within 3 minutes"
-- [ ] UI: Waypoint showing marker location, distance, time remaining
-- [ ] Detection radius: 20m from marker center
-- [ ] Success: All riders get reward notification
-- [ ] Failure: Timer expires, no penalty, new objective spawns
+- [x] Server spawns objective marker at random valid location
+- [x] Objective type: "Shepherd worm to marker within 3 minutes"
+- [x] UI: Waypoint showing marker location, distance, time remaining
+- [x] Detection radius: 20m from marker center
+- [x] Success: All riders get reward notification
+- [x] Failure: Timer expires, no penalty, new objective spawns
 
-**Tests**: Objective completes when worm reaches marker, timer enforced
+**Tests**: Objective completes when worm reaches marker, timer enforced ✅
 
 ### 7. Character Animations
 - [ ] Refine character model (150-300 polys)
