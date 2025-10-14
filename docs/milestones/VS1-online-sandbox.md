@@ -9,99 +9,99 @@ Create the minimal viable multiplayer experience: players can join a server, see
 ## Deliverables
 
 ### 1. Monorepo Setup
-- [ ] Initialize pnpm workspace with `apps/client`, `apps/server`, `packages/shared`, `packages/protocol`
-- [ ] Configure TypeScript strict mode across all packages
-- [ ] Set up ESLint with shared config
-- [ ] Create basic CI pipeline (GitHub Actions): lint + typecheck on PR
+- [x] Initialize pnpm workspace with `apps/client`, `apps/server`, `packages/shared`, `packages/protocol`
+- [x] Configure TypeScript strict mode across all packages
+- [x] Set up ESLint with shared config
+- [x] Create basic CI pipeline (GitHub Actions): lint + typecheck on PR
 
-**Tests**: `pnpm install` runs cleanly, `pnpm run --parallel build` succeeds
+**Tests**: `pnpm install` runs cleanly, `pnpm run --parallel build` succeeds ✅
 
 ### 2. Client Foundation
-- [ ] Vite + Three.js project setup in `apps/client`
-- [ ] Basic WebGL renderer with FPS counter
-- [ ] PerspectiveCamera with OrbitControls for debugging
-- [ ] Simple InputManager capturing WASD + mouse
-- [ ] Basic low-poly character placeholder (colored capsule, 50 polys)
+- [x] Vite + Three.js project setup in `apps/client`
+- [x] Basic WebGL renderer with FPS counter
+- [x] PerspectiveCamera with OrbitControls for debugging
+- [x] Simple InputManager capturing WASD + mouse
+- [x] Basic low-poly character placeholder (colored capsule, 50 polys)
 
-**Tests**: Client runs at 60fps with debug camera
+**Tests**: Client runs at 60fps with debug camera ✅
 
 ### 3. Server Foundation
-- [ ] Node.js + Socket.io server in `apps/server`
-- [ ] JWT authentication endpoint `/auth/token`
-- [ ] Socket.io auth middleware validating JWT
-- [ ] Basic Room class managing connected players
-- [ ] Fixed timestep game loop (30hz) logging tick count
+- [x] Node.js + Socket.io server in `apps/server`
+- [x] JWT authentication endpoint `/auth/token`
+- [x] Socket.io auth middleware validating JWT
+- [x] Basic Room class managing connected players
+- [x] Fixed timestep game loop (30hz) logging tick count
 
-**Tests**: Server accepts 4 simultaneous connections, validates JWT rejection
+**Tests**: Server accepts 4 simultaneous connections, validates JWT rejection ✅
 
 ### 4. Basic Networking
-- [ ] Define `C_INPUT`, `S_WELCOME`, `S_STATE` in `packages/protocol`
-- [ ] Client NetworkManager connects with JWT
-- [ ] Server processes `C_INPUT` and broadcasts `S_STATE`
-- [ ] Connection/disconnection handlers with logging
-- [ ] Reconnection logic (5min in-memory state)
+- [x] Define `C_INPUT`, `S_WELCOME`, `S_STATE` in `packages/protocol`
+- [x] Client NetworkManager connects with JWT
+- [x] Server processes `C_INPUT` and broadcasts `S_STATE`
+- [x] Connection/disconnection handlers with logging
+- [x] Reconnection logic (5min in-memory state)
 
-**Tests**: 2 clients connect, see each other's placeholder characters, one disconnects/reconnects
+**Tests**: 2 clients connect, see each other's placeholder characters, one disconnects/reconnects ✅
 
 ### 5. Procedural Terrain
-- [ ] Seed-based Simplex noise heightmap generator in `packages/shared`
-- [ ] Client chunk system (32m × 32m chunks)
-- [ ] Basic vertex coloring (sand yellow/brown)
-- [ ] Simple LOD (2 levels: 800 polys, 400 polys)
-- [ ] Server stores heightmap for collision
+- [x] Seed-based Simplex noise heightmap generator in `packages/shared`
+- [x] Client chunk system (32m × 32m chunks)
+- [x] Basic vertex coloring (sand yellow/brown)
+- [x] Simple LOD (2 levels: 800 polys, 400 polys)
+- [x] Server stores heightmap for collision
 
-**Tests**: Deterministic terrain generates from seed, chunks load/unload around player
+**Tests**: Deterministic terrain generates from seed, chunks load/unload around player ✅
 
 ### 6. Server-Side Physics
-- [ ] Server validates player position against heightmap
-- [ ] Clamp player Y to terrain height + offset
-- [ ] Send corrected position in `S_STATE`
-- [ ] Basic anti-cheat: movement speed validation (max 10 m/s)
+- [x] Server validates player position against heightmap
+- [x] Clamp player Y to terrain height + offset
+- [x] Send corrected position in `S_STATE`
+- [x] Basic anti-cheat: movement speed validation (max 10 m/s)
 
-**Tests**: Player stays on terrain surface, speed hack detected and corrected
+**Tests**: Player stays on terrain surface, speed hack detected and corrected ✅
 
 ### 7. Client Prediction V0
-- [ ] Client predicts movement locally
-- [ ] Buffer last 200ms of inputs with sequence numbers
-- [ ] Simple reconciliation: lerp to server position if error <0.5m
-- [ ] Log large corrections (>1m)
+- [x] Client predicts movement locally
+- [x] Buffer last 200ms of inputs with sequence numbers
+- [x] Simple reconciliation: lerp to server position if error <0.5m
+- [x] Log large corrections (>1m)
 
-**Tests**: Movement feels responsive <100ms with 100ms simulated latency
+**Tests**: Movement feels responsive <100ms with 100ms simulated latency ✅
 
 ### 8. Basic Sandworm
-- [ ] Procedural worm model (10 segments, 1200 polys total)
-- [ ] CatmullRomCurve3-based spline movement
-- [ ] Server-side patrol AI: pick random target, move along curve
-- [ ] Send 8-12 control points in `S_STATE`
-- [ ] Client interpolates curve and positions segments
+- [x] Procedural worm model (10 segments, 1200 polys total)
+- [x] CatmullRomCurve3-based spline movement
+- [x] Server-side patrol AI: pick random target, move along curve
+- [x] Send 8-12 control points in `S_STATE`
+- [x] Client interpolates curve and positions segments
 
-**Tests**: Worm patrols smoothly, visible to all clients, synchronized
+**Tests**: Worm patrols smoothly, visible to all clients, synchronized ✅
 
 ### 9. Thumper Attraction
-- [ ] Basic thumper model (200 polys, vertex colors)
-- [ ] Server command `/giveThumper` adds thumper to inventory
-- [ ] Client sends `C_INPUT` with `action: { type: "thumper" }`
-- [ ] Server validates, spawns thumper entity
-- [ ] Server worm AI: detect thumper vibration, move toward it
-- [ ] Client shows thumper with pulsing animation when active
+- [x] Basic thumper model (200 polys, vertex colors)
+- [x] Server command `/giveThumper` adds thumper to inventory (players start with 3)
+- [x] Client sends `C_INPUT` with `action: { type: "deployThumper" }`
+- [x] Server validates, spawns thumper entity
+- [x] Server worm AI: detect thumper vibration, move toward it
+- [x] Client shows thumper with pulsing animation when active
 
-**Tests**: Deployed thumper attracts nearby worm, worm changes path, thumper expires after 60s
+**Tests**: Deployed thumper attracts nearby worm, worm changes path, thumper expires after 60s ✅
 
 ### 10. Basic Communication
-- [ ] Text chat system (global channel only)
-- [ ] `C_CHAT` / `S_CHAT` messages
-- [ ] Simple HTML overlay chat UI
-- [ ] Basic rate limiting (1 message/2 seconds)
+- [x] Text chat system (global channel only)
+- [x] `C_CHAT` / `S_CHAT` messages
+- [x] Simple HTML overlay chat UI
+- [x] Basic rate limiting (1 message/2 seconds)
 
-**Tests**: Players send/receive chat messages, rate limit blocks spam
+**Tests**: Players send/receive chat messages, rate limit blocks spam ✅
 
 ### 11. Interest Management V0
-- [ ] Server 32m × 32m grid
-- [ ] Track which entities in which cells
-- [ ] Only broadcast entities within 300m of player
-- [ ] Full snapshot every 5 seconds
+- [x] Server 32m × 32m grid (implemented in InterestManager)
+- [x] Track which entities in which cells
+- [ ] Only broadcast entities within 300m of player (not integrated yet - all entities broadcast)
+- [ ] Full snapshot every 5 seconds (not implemented)
 
-**Tests**: Client only receives nearby entity updates, bandwidth measured <30 kbps/player
+**Tests**: Client only receives nearby entity updates, bandwidth measured <30 kbps/player (⚠️ Basic implementation, optimization deferred)
 
 ## Technical Requirements
 

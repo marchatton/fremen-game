@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { S_WELCOME, S_STATE } from '@fremen/protocol';
+import type { S_WELCOME, S_STATE, S_CHAT } from '@fremen/protocol';
 
 export class NetworkManager {
   private socket: Socket | null = null;
@@ -9,6 +9,7 @@ export class NetworkManager {
   private connected = false;
   private onWelcomeCallback?: (data: S_WELCOME) => void;
   private onStateCallback?: (data: S_STATE) => void;
+  private onChatCallback?: (data: S_CHAT) => void;
 
   constructor(serverUrl: string) {
     this.serverUrl = serverUrl;
@@ -68,6 +69,12 @@ export class NetworkManager {
       this.socket.on('error', (error) => {
         console.error('Server error:', error);
       });
+
+      this.socket.on('chat', (data: S_CHAT) => {
+        if (this.onChatCallback) {
+          this.onChatCallback(data);
+        }
+      });
     });
   }
 
@@ -103,6 +110,21 @@ export class NetworkManager {
 
   onState(callback: (data: S_STATE) => void) {
     this.onStateCallback = callback;
+  }
+
+  onChat(callback: (data: S_CHAT) => void) {
+    this.onChatCallback = callback;
+  }
+
+  sendChat(message: string) {
+    if (!this.socket || !this.connected) return;
+
+    const chatMessage = {
+      type: 'C_CHAT' as const,
+      message,
+    };
+
+    this.socket.emit('chat', chatMessage);
   }
 
   disconnect() {

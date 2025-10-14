@@ -4,6 +4,7 @@ import { CameraController } from './core/Camera';
 import { InputManager } from './core/InputManager';
 import { Player } from './entities/Player';
 import { FPSCounter } from './ui/FPSCounter';
+import { ChatUI } from './ui/ChatUI';
 import { NetworkManager } from './networking/NetworkManager';
 import { PredictionManager } from './core/PredictionManager';
 import * as THREE from 'three';
@@ -20,7 +21,12 @@ const camera = renderer.getCamera();
 const cameraController = new CameraController(camera, canvas);
 const inputManager = new InputManager();
 const fpsCounter = new FPSCounter();
+const chatUI = new ChatUI();
 const predictionManager = new PredictionManager();
+
+chatUI.onSend((message) => {
+  network.sendChat(message);
+});
 
 const serverUrl = 'http://localhost:3000';
 const network = new NetworkManager(serverUrl);
@@ -39,6 +45,10 @@ network.onWelcome((data) => {
   
   terrainManager = new TerrainManager(scene, data.seed);
   terrainManager.update(0, 0);
+});
+
+network.onChat((data) => {
+  chatUI.addMessage(data.playerName, data.message);
 });
 
 network.onState((data) => {

@@ -5,6 +5,7 @@ import { GAME_CONSTANTS } from '@fremen/shared';
 import { generateToken, verifyToken } from './auth/jwt';
 import { Room } from './game/Room';
 import { GameLoop } from './game/GameLoop';
+import { RateLimiter } from './game/RateLimiter';
 
 const PORT = process.env.PORT || 3000;
 
@@ -30,6 +31,8 @@ app.get('/auth/token', (req, res) => {
 const WORLD_SEED = 12345;
 const mainRoom = new Room('main');
 const gameLoop = new GameLoop(mainRoom, WORLD_SEED);
+const chatRateLimiter = new RateLimiter();
+
 gameLoop.start();
 
 io.use((socket, next) => {
@@ -100,6 +103,34 @@ io.on('connection', (socket) => {
       velocity,
       rotation,
     });
+  });
+
+  socket.on('chat', (data) => {
+    const player = mainRoom.getPlayer(playerId);
+    if (!player) return;
+
+    if (!chatRateLimiter.check(playerId, 1, 2000)) {
+      socket.emit('error', { message: 'Chat rate limit exceeded' });
+      return;
+    }
+
+    if (!data.message || data.message.length > 200) {
+      return;
+    }
+
+    const chatMessage = {
+      type: 'S_CHAT',
+      playerId,
+      playerName: username,
+      message: data.message,
+      timestamp: Date.now(),
+    };
+
+    for (const p of mainRoom.getAllPlayers()) {
+      p.socket.emit('chat', chatMessage);
+    }
+
+    console.log(`Chat from ${username}: ${data.message}`);
   });
 });
 
