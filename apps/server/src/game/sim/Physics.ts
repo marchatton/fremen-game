@@ -16,7 +16,7 @@ export class Physics {
     };
 
     const terrainHeight = this.terrainGenerator.getHeight(newPosition.x, newPosition.z);
-    newPosition.y = Math.max(newPosition.y, terrainHeight + 1);
+    newPosition.y = terrainHeight + 1;
 
     return newPosition;
   }
