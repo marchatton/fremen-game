@@ -7,7 +7,12 @@ export class CameraController {
   private target: THREE.Vector3 = new THREE.Vector3();
   private smoothedTarget: THREE.Vector3 = new THREE.Vector3();
   private offset: THREE.Vector3 = new THREE.Vector3(0, 5, 10);
+  private ridingOffset: THREE.Vector3 = new THREE.Vector3(0, 8, 15);
+  private currentOffset: THREE.Vector3 = new THREE.Vector3(0, 5, 10);
   private debugMode = false;
+  private isRidingMode = false;
+  private targetFov = 75;
+  private currentFov = 75;
 
   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
@@ -41,10 +46,23 @@ export class CameraController {
       this.orbitControls.update();
     } else {
       this.smoothedTarget.lerp(this.target, Math.min(1, deltaTime * 10));
-      const targetPosition = this.smoothedTarget.clone().add(this.offset);
+      
+      const targetOffset = this.isRidingMode ? this.ridingOffset : this.offset;
+      this.currentOffset.lerp(targetOffset, deltaTime * 3);
+      
+      const targetPosition = this.smoothedTarget.clone().add(this.currentOffset);
       this.camera.position.lerp(targetPosition, deltaTime * 5);
       this.camera.lookAt(this.smoothedTarget);
+
+      this.currentFov += (this.targetFov - this.currentFov) * deltaTime * 5;
+      this.camera.fov = this.currentFov;
+      this.camera.updateProjectionMatrix();
     }
+  }
+
+  setRidingMode(riding: boolean) {
+    this.isRidingMode = riding;
+    this.targetFov = riding ? 70 : 75;
   }
 
   isDebugMode(): boolean {
