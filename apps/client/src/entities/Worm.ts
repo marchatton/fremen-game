@@ -5,6 +5,7 @@ export class Worm {
   private segments: THREE.Mesh[] = [];
   private group: THREE.Group;
   public id: string;
+  private animationTime = 0;
 
   constructor(id: string) {
     this.id = id;

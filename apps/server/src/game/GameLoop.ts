@@ -2,12 +2,14 @@ import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
 import type { Room } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
+import { WormDamage } from './sim/WormDamage';
 import { ObjectiveManager } from './ObjectiveManager';
 
 export class GameLoop {
   private room: Room;
   private physics: Physics;
   private wormAI: WormAI;
+  private wormDamage: WormDamage;
   private objectiveManager: ObjectiveManager;
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -17,6 +19,7 @@ export class GameLoop {
     this.room = room;
     this.physics = new Physics(seed);
     this.wormAI = new WormAI();
+    this.wormDamage = new WormDamage(seed);
     this.objectiveManager = new ObjectiveManager();
     this.objectiveManager.spawnRandomObjective();
   }
@@ -96,6 +99,16 @@ export class GameLoop {
     for (const worm of worms) {
       if (worm.aiState === 'RIDDEN_BY' && worm.controlPoints.length > 0) {
         this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
+      }
+
+      const damage = this.wormDamage.checkTerrainDamage(worm);
+      if (damage > 0) {
+        const died = this.wormDamage.applyDamage(worm, damage);
+        
+        if (died && worm.riderId) {
+          this.handleDismount(worm.riderId);
+          console.log(`Worm ${worm.id} died, ejecting rider`);
+        }
       }
     }
   }

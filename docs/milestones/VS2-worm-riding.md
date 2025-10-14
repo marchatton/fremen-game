@@ -33,14 +33,14 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Worm responds to steering within 100ms, constrained to realistic movement ✅
 
 ### 3. Advanced Worm Animation
-- [ ] Procedural segment undulation (sine wave perpendicular to movement)
-- [ ] Head "look ahead" toward target direction
-- [ ] Tail follows with slight lag for whip effect
+- [x] Procedural segment undulation (sine wave perpendicular to movement)
+- [x] Head "look ahead" toward target direction
+- [x] Tail follows with slight lag for whip effect
 - [ ] Dust particle trail spawns at segment positions
 - [ ] Sound: rumble intensity based on speed
 - [ ] Camera shake effect proportional to worm speed
 
-**Tests**: Worm looks fluid at all speeds, particles/sound match movement
+**Tests**: Worm looks fluid at all speeds, particles/sound match movement (partial ✅)
 
 ### 4. Dismounting System
 - [x] "Press E to Dismount" prompt while riding
@@ -54,13 +54,13 @@ This is the **core gameplay milestone**. Players can mount a worm attracted by t
 **Tests**: Player dismounts safely, invulnerability works, worm becomes available again (partial ✅)
 
 ### 5. Worm Health & Danger
-- [ ] Worm has health (1000 HP)
-- [ ] Terrain obstacles damage worm (rocks: 50 HP/collision)
+- [x] Worm has health (1000 HP)
+- [x] Terrain obstacles damage worm (rocks: 50 HP/collision)
 - [ ] Out-of-bounds zones (marked on map) force dismount
-- [ ] Worm death: explosion VFX, rider ejected with damage
+- [x] Worm death: explosion VFX, rider ejected with damage
 - [ ] Worm respawns at random location after 2 minutes
 
-**Tests**: Worm takes damage from obstacles, death handled gracefully
+**Tests**: Worm takes damage from obstacles, death handled gracefully (partial ✅)
 
 ### 6. First Objective: Shepherd Worm
 - [x] Server spawns objective marker at random valid location

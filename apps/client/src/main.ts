@@ -163,7 +163,7 @@ network.onState((data) => {
       console.log(`Added worm: ${wormState.id}`);
     }
 
-    worm.updateFromState(wormState, deltaTime);
+    worm.updateFromState(wormState, currentDeltaTime);
   }
 
   const currentWormIds = new Set(data.worms.map((w) => w.id));
@@ -209,12 +209,14 @@ let terrainManager: TerrainManager | null = null;
 let heightSampler: TerrainGenerator | null = null;
 
 let lastTime = performance.now();
+let currentDeltaTime = 0.016;
 
 function animate() {
   requestAnimationFrame(animate);
 
   const currentTime = performance.now();
   const deltaTime = (currentTime - lastTime) / 1000;
+  currentDeltaTime = deltaTime;
   lastTime = currentTime;
 
   const movement = inputManager.getMovement();
