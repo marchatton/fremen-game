@@ -1,4 +1,4 @@
-import { GAME_CONSTANTS } from '@fremen/shared';
+import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
 import type { Room } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
