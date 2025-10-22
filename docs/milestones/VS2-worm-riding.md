@@ -1,6 +1,7 @@
 # VS2: Worm Riding Core (MVP)
 
 **Duration**: 4-6 weeks  
+**Status**: 8/11 Complete (73%) - **CORE GAMEPLAY PLAYABLE** ✅  
 **Goal**: Implement complete worm riding mechanics and first playable objective loop
 
 ## Overview
