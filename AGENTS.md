@@ -1,215 +1,168 @@
-# AGENTS.md - Fremen Game Development Guide
+# AGENTS.md (Merged Lite)
 
-## Quick Reference
+**Purpose:** Lean, repo-specific guardrails for Codex. Be precise; skip agent meta. Defaults for this repo: **pnpm** workspaces, Vite + Three.js client, Socket.io Node server, TypeScript (strict), Vitest, DrizzleORM + PostgreSQL (VS3+).
 
-**Project**: Tactical multiplayer sandworm riding game (Dune-themed)  
-**Tech Stack**: Three.js + Node.js + Socket.io + TypeScript + DrizzleORM + PostgreSQL  
-**Package Manager**: pnpm (monorepo with workspaces)  
-**Development Phase**: Pre-VS1 (Documentation complete, implementation starting)
+---
 
-## Commands
+## 0) Engineering Principles
 
-### Development
-- **Build**: `pnpm run build` (single package) or `pnpm run --parallel build` (all packages)
-- **Dev**: `pnpm run dev` (starts client with HMR + server with nodemon)
-- **Test**: `pnpm test` (runs all tests across workspaces)
-- **Test Single**: `pnpm --filter @fremen/client test` (test specific package)
-- **Lint**: `pnpm run lint`
-- **Typecheck**: `pnpm run typecheck`
+- **TDD**: write or update a failing test (Vitest) before gameplay/state fixes.
+- **KISS**: favour simple deterministic server logic and lightweight client visuals.
+- **YAGNI**: ship only what the current milestone needs (JSON protocol, in-memory state unless persistence is required).
+- **DRY**: put shared types/constants in `packages/shared` or `packages/protocol`; keep client/server copies in sync through those packages.
 
-### Workspace-Specific
+## 1) Project Profile & Non-negotiables
+
+- **Monorepo:** pnpm workspaces (`apps/*`, `packages/*`)
+- **Client:** `apps/client` — Vite + Three.js + TypeScript, HUD via HTML overlays
+- **Server:** `apps/server` — Node.js + Socket.io + TypeScript (tsx watcher), authoritative game loop @30 Hz
+- **Shared packages:** `@fremen/shared` (constants, types, terrain), `@fremen/protocol` (message schemas), `@fremen/config` (ESLint/TS configs)
+- **Database:** DrizzleORM + PostgreSQL (VS3 resource loop). Treat as planned but optional; wrap writes in transactions
+- **Networking:** JSON protocol with reconciliation; all messages defined in `packages/protocol`
+- **Testing:** Vitest across server/shared (unit + integration); client tests to live under `apps/client/src/tests`
+- **Docs:** Core references in `docs/00-overview.md`, `docs/01-architecture.md`, `docs/04-edge-cases-resilience.md`, milestone specs
+
+---
+
+## 2) Structure & Security Boundaries
+
+**Repo top-level**
+
+```
+/
+  apps/
+    client/            # Vite + Three.js frontend
+    server/            # Socket.io authoritative server
+  packages/
+    shared/            # shared types/constants/terrain utilities
+    protocol/          # network message contracts & helpers
+    config/            # eslint + tsconfig bases
+  docs/                # design + milestone documentation
+  old-docs/            # legacy planning (read-only)
+```
+
+**Client (`apps/client/src`)**
+
+```
+core/           # Renderer, camera, input, prediction
+entities/       # Player, Worm, Thumper visuals
+networking/     # NetworkManager, reconciliation
+terrain/        # TerrainManager, chunk loading
+ui/             # HUD, chat, prompts (DOM overlays)
+```
+
+**Server (`apps/server/src`)**
+
+```
+auth/           # JWT helpers
+ game/
+   GameLoop.ts       # fixed tick loop (30 Hz)
+   Room.ts           # session management & thumpers
+   sim/              # deterministic systems (Physics, WormAI, WormDamage)
+   ObjectiveManager.ts
+ db/             # Drizzle schema/config/persistence (VS3)
+integration.test.ts  # server integration tests
+```
+
+**Critical Rules**
+
+- Server remains the single authority; never apply client-side state changes without server validation.
+- Keep shared schema/types in `packages/shared`/`packages/protocol`; avoid ad hoc type copies in client/server code.
+- Broadcasts must include `lastProcessedInputSeq`; reconciliation logic expects it.
+- Wrap resource persistence in transactions; Drizzle helpers live in `apps/server/src/db`.
+- When adding protocol messages or entities, follow the documented steps (update shared types, server logic, client visuals, tests, docs).
+
+---
+
+## 3) Do / Don’t (Repo-specific)
+
+**Do**
+
+- Use **pnpm** with workspace filters (`pnpm --filter @fremen/* ...`).
+- Consult milestone docs before new systems; keep documentation updated alongside code.
+- Extend simulation/gameplay via `sim/` modules to preserve determinism.
+- Add or update Vitest suites (server + shared) for game loop, worm AI, resource logic.
+- Reuse `TerrainGenerator` + constants from `@fremen/shared`; avoid duplicating math in client/server.
+- Document any protocol/schema changes in `docs/02-network-protocol.md` and regenerate diagrams if needed.
+
+**Don’t**
+
+- Introduce new runtime deps without confirming cross-workspace impact (client bundle size & server perf).
+- Hardcode duplicate message shapes in client/server; import from `@fremen/protocol` instead.
+- Bypass persistence helpers when VS3 systems are active (use `persistence.ts`, transactions, autosave manager).
+- Commit migrations or schema edits without aligning Drizzle config + `.env.example`.
+
+---
+
+## 4) Commands (pnpm)
+
 ```bash
-# Run command in specific workspace
-pnpm --filter @fremen/client <command>
-pnpm --filter @fremen/server <command>
-pnpm --filter @fremen/protocol <command>
+# Install
+pnpm install
 
-# Add dependency to workspace
-pnpm --filter @fremen/client add three
-pnpm --filter @fremen/server add socket.io
+# Dev (both client + server)
+pnpm run dev
+pnpm run dev:client
+pnpm run dev:server
+pnpm --filter @fremen/client dev
+pnpm --filter @fremen/server dev
+
+# Build
+pnpm run build            # all workspaces
+pnpm --filter @fremen/client build
+pnpm --filter @fremen/server build
+
+# Tests
+pnpm test                 # all workspaces
+pnpm --filter @fremen/server test
+pnpm --filter @fremen/shared test
+
+# Lint / Typecheck
+pnpm run lint
+pnpm run typecheck
+pnpm --filter @fremen/client lint
+pnpm --filter @fremen/server typecheck
 ```
 
-## Architecture Overview
+**Root `package.json` scripts**
 
-### Monorepo Structure
-```
-apps/
-  client/          # Three.js + Vite frontend
-  server/          # Node.js + Socket.io backend
-packages/
-  shared/          # Types, constants, utilities
-  protocol/        # Network message schemas (C_*, S_*)
-  config/          # Shared tsconfig/eslint
-```
-
-### Key Systems
-- **Client Prediction**: Buffer 200ms inputs, predict locally, reconcile on server update
-- **Server Authority**: Fixed 30-60hz tick loop, validates all inputs, broadcasts 10-20hz
-- **Interest Management**: 32m×32m grid, only send entities within 300m of player
-- **State Sync**: JSON initially → binary when >50 kbps/player or tick CPU >60%
-- **Bot Backfill**: Always fill to 4 entities (humans + bots) to ensure viable matches
-
-### Network Protocol
-- **C_INPUT**: Client → Server (movement, actions) with sequence numbers
-- **S_STATE**: Server → Client (delta updates, 10-20hz) with `lastProcessedInputSeq` for reconciliation
-- **S_SNAPSHOT**: Full state every 5 seconds to prevent drift
-- **S_EVENT**: One-time events (damage, collection, etc.)
-
-See [docs/05-diagrams.md](docs/05-diagrams.md) for visual references.
-
-## Code Style & Principles
-
-### Philosophy (SOLID, DRY, KISS, YAGNI)
-- **TDD**: Test-first for core logic (state sync, worm AI, resource validation, network protocol)
-- **SOLID**: Single responsibility, open/closed, dependency inversion
-- **DRY**: Business rules have one source of truth (define in `packages/shared`, use everywhere)
-- **KISS**: Simplest solution first (JSON protocol, in-memory state, no Redis initially)
-- **YAGNI**: Skip features until metrics prove necessity (binary protocol, advanced scaling, etc.)
-
-### TypeScript
-- **Strict mode**: Enabled across all packages
-- **No `any`**: Use `unknown` and narrow with type guards
-- **Shared types**: Define in `packages/shared/src/types/`, import everywhere
-- **Protocol types**: Define in `packages/protocol/src/messages.ts`
-
-### Testing Strategy
-```typescript
-// Unit tests: Pure functions, deterministic
-describe('TerrainGenerator', () => {
-  it('generates same terrain from same seed', () => {
-    const terrain1 = generateTerrain(SEED);
-    const terrain2 = generateTerrain(SEED);
-    expect(terrain1).toEqual(terrain2);
-  });
-});
-
-// Integration tests: Client-server interaction
-describe('Worm Attraction', () => {
-  it('worm moves toward thumper', async () => {
-    const server = await startTestServer();
-    const client = await connectTestClient();
-    await client.deployThumper([10, 0, 10]);
-    await wait(2000);
-    const worm = server.getWorm(0);
-    expect(worm.target).toBeCloseTo([10, 0, 10]);
-  });
-});
+```json
+{
+  "scripts": {
+    "build": "pnpm --parallel build",
+    "dev": "pnpm --parallel --filter @fremen/server --filter @fremen/client dev",
+    "dev:server": "pnpm --filter @fremen/server dev",
+    "dev:client": "pnpm --filter @fremen/client dev",
+    "test": "pnpm --parallel test",
+    "lint": "pnpm --parallel lint",
+    "typecheck": "pnpm --parallel typecheck"
+  }
+}
 ```
 
-### Low-Poly Art Style
-- **Polygon Targets**: Characters 150-300, Objects 50-200, Worm segments 100-150
-- **Vertex Colors**: Primary coloring method (avoid textures where possible)
-- **LOD Levels**: Minimum 2 levels (full detail <50m, simplified >50m)
-- **Procedural Generation**: Use `LowPolyMeshFactory` in `apps/client/src/lowpoly/`
+---
 
-### Performance Targets
-- **Client**: 60fps on GTX 1060 / RX 580 with 20 visible entities
-- **Server**: 30-60hz tick stable with 8 players per room
-- **Network**: <30 kbps/player (JSON), <20 kbps/player (binary)
-- **Latency**: Playable at 150ms RTT with prediction/reconciliation
+## 5) Git & Hooks (concise)
 
-## Directory Conventions
+- **Commits:** Conventional style encouraged (`feat(server): ...`, `fix(protocol): ...`, `docs(milestone): ...`).
+- **Hooks:** No Husky configured yet. Before pushing run `pnpm run lint`, `pnpm run typecheck`, `pnpm test` manually.
+- Keep gameplay changes small & reviewable; include docs/tests in same commit when practical.
 
-### Client (`apps/client/src/`)
-```
-core/           # Renderer, Camera, InputManager, AssetManager
-entities/       # Player, Worm, Thumper, AI (visual representations)
-networking/     # NetworkManager, prediction, reconciliation
-lowpoly/        # LowPolyMeshFactory, procedural generation
-terrain/        # Chunk management, heightmap, LOD
-materials/      # MaterialManager, shader setup
-shaders/        # GLSL vertex/fragment shaders
-physics/        # Client-side prediction physics
-ui/             # HUD, menus, chat (HTML/CSS overlay)
-tests/          # Unit/integration tests
-```
+---
 
-### Server (`apps/server/src/`)
-```
-game/
-  loop.ts       # Fixed timestep game loop (30-60hz)
-  room.ts       # Room/session management
-  sim/          # Pure simulation systems (movement, worm AI, combat)
-  interest.ts   # Interest management grid
-networking/
-  socketServer.ts    # Socket.io setup
-  messageRouter.ts   # Route C_* messages to handlers
-  stateSync.ts       # Delta compression, broadcast logic
-auth/           # JWT generation/validation, middleware
-db/             # DrizzleORM schema, migrations, queries
-bots/           # Bot AI, backfill logic
-matchmaking/    # Queue management, room assignment
-tests/          # Unit/integration tests
-```
+## 6) Lint / Format / Scan
 
-## Security & Validation
+- **ESLint:** shared flat config in `packages/config/eslint.config.js`; run via `pnpm run lint` or workspace filters.
+- **TypeScript:** strict configs per workspace (extends `packages/config/tsconfig.base.json`).
+- **Formatting:** rely on ESLint + editor formatting; no repo-wide Prettier yet—match existing style.
+- **Static analysis:** `pnpm run typecheck` across workspaces; add Vitest coverage for complex logic.
 
-- **Server Authority**: ALL game state changes validated server-side
-- **Input Validation**: Check distance, speed, physics constraints on every C_INPUT
-- **Idempotency**: Use action IDs (client-generated UUID) to prevent duplicate resource operations
-- **Transactions**: Wrap all resource changes in DB transactions
-- **Rate Limits**: Max 10 actions/second per player, 1 chat message/2 seconds
-- **Anti-Cheat**: Log speed hacks, teleports, clipping; kick after 3 offenses in 5 minutes
+---
 
-## Common Patterns
+## 7) Testing (minimal but effective)
 
-### Adding a New Entity Type
-1. Define in `packages/shared/src/types/entity.ts`
-2. Add server-side simulation in `apps/server/src/game/sim/`
-3. Add client-side rendering in `apps/client/src/entities/`
-4. Update `S_STATE` message to include new entity data
-5. Add tests for spawning, updating, removing
+- **Server:** Vitest suites for `game/` systems (GameLoop, WormAI, Mount/Dismount, RateLimiter). Add deterministic tests for new simulation logic or resource rules.
+- **Shared:** Terrain generator + utility tests live in `packages/shared`; extend when changing constants/math.
+- **Client:** Future Three.js/unit tests reside in `apps/client/src/tests`; at minimum run manual HMR session per `TESTING.md` when touching rendering/input.
+- **Rule:** bug → failing test → fix → green. Keep integration tests fast (<5 s) and deterministic (no randomness without seeding).
 
-### Adding a New Network Message
-1. Define type in `packages/protocol/src/messages.ts`
-2. Add handler in `apps/server/src/networking/messageRouter.ts`
-3. Emit from client in `apps/client/src/networking/NetworkManager.ts`
-4. Add validation tests
-5. Document in `docs/02-network-protocol.md`
-
-### Adding a New Objective Type
-1. Define in `packages/shared/src/types/objective.ts`
-2. Add server-side logic in `apps/server/src/game/sim/objectiveManager.ts`
-3. Add client-side UI in `apps/client/src/ui/ObjectiveTracker.ts`
-4. Add completion validation and reward distribution
-5. Add tests for success/failure conditions
-
-## Documentation
-
-**Always consult these docs before implementing major features**:
-
-1. **[00-overview.md](docs/00-overview.md)** - Vision, MVP, success metrics
-2. **[01-architecture.md](docs/01-architecture.md)** - Monorepo, state sync, persistence strategy
-3. **[02-network-protocol.md](docs/02-network-protocol.md)** - Message schemas, timing, interest management
-4. **[03-gameplay-mechanics.md](docs/03-gameplay-mechanics.md)** - Worm behavior, combat, resources
-5. **[04-edge-cases-resilience.md](docs/04-edge-cases-resilience.md)** - Bot backfill, disconnects, exploits
-6. **[05-diagrams.md](docs/05-diagrams.md)** - Visual architecture (data flow, timing, packages)
-7. **[milestones/](docs/milestones/)** - VS1-VS6 detailed requirements
-
-## Current Milestone: Pre-VS1
-
-**Next Steps** (in order):
-1. Set up pnpm workspace (`pnpm-workspace.yaml`)
-2. Create `packages/shared`, `packages/protocol`, `packages/config`
-3. Initialize `apps/client` (Vite + Three.js + TypeScript)
-4. Initialize `apps/server` (Node.js + Socket.io + TypeScript)
-5. Set up ESLint/TypeScript configs
-6. Implement basic CI pipeline (GitHub Actions)
-
-See [docs/milestones/VS1-online-sandbox.md](docs/milestones/VS1-online-sandbox.md) for VS1 detailed checklist.
-
-## When to Ask for Help
-
-- **Architecture decisions**: Consult docs first, then ask human if unclear
-- **Performance issues**: Profile first, share metrics, discuss optimization
-- **Edge cases not covered**: Check [docs/04-edge-cases-resilience.md](docs/04-edge-cases-resilience.md), then ask
-- **Testing strategy**: Follow patterns in milestone docs
-- **Protocol changes**: Document in `docs/02-network-protocol.md` and update [docs/05-diagrams.md](docs/05-diagrams.md)
-
-## Remember
-
-- **Build vertically** (end-to-end features) not horizontally (layers across all features)
-- **Test first** for core systems (movement, state sync, combat, resources)
-- **Start simple** (JSON, in-memory) and add complexity only when metrics demand it
-- **Bot backfill** ensures game is playable even with low player count
-- **Fun first** - VS2 (worm riding) must be engaging or the game fails
