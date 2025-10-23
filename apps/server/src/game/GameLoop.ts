@@ -14,6 +14,7 @@ import { DeathManager } from './DeathManager';
 import { CombatSystem, WeaponType } from './CombatSystem';
 import { HarkonnenAI, HarkonnenState } from './ai/HarkonnenAI';
 import { OutpostManager } from './OutpostManager';
+import { AlertSystem } from './AlertSystem';
 
 export class GameLoop {
   private room: Room;
@@ -35,6 +36,7 @@ export class GameLoop {
   private combatSystem: CombatSystem;
   private harkonnenAI: HarkonnenAI;
   private outpostManager: OutpostManager;
+  private alertSystem: AlertSystem;
 
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -67,6 +69,10 @@ export class GameLoop {
     this.combatSystem = new CombatSystem();
     this.harkonnenAI = new HarkonnenAI();
     this.outpostManager = new OutpostManager(seed);
+    this.alertSystem = new AlertSystem();
+
+    // Connect alert system to AI
+    this.harkonnenAI.setAlertSystem(this.alertSystem);
 
     // Generate outposts and spawn Harkonnen
     const oasisPositions = this.oasisManager.getOases().map(o => o.position);
@@ -254,6 +260,9 @@ export class GameLoop {
       state: p.state.state,
     }));
     this.harkonnenAI.update(deltaTime, playerData);
+
+    // VS4: Cleanup expired alerts
+    this.alertSystem.cleanup();
 
     // VS4: Apply Harkonnen damage to players
     const shots = this.harkonnenAI.getShotsFired();
@@ -527,5 +536,9 @@ export class GameLoop {
 
   getOasisManager(): OasisManager {
     return this.oasisManager;
+  }
+
+  getAlertSystem(): AlertSystem {
+    return this.alertSystem;
   }
 }

@@ -1,5 +1,6 @@
 import type { Vector3 } from '@fremen/shared';
 import { CombatSystem, WeaponType, type ShootResult } from '../CombatSystem';
+import type { AlertSystem } from '../AlertSystem';
 
 export enum HarkonnenState {
   PATROL = 'PATROL',
@@ -48,6 +49,7 @@ export class HarkonnenAI {
   private troopers: Map<string, HarkonnenTrooper> = new Map();
   private combatSystem: CombatSystem;
   private shotsFired: ShootResult[] = [];
+  private alertSystem?: AlertSystem;
 
   // AI Configuration
   private readonly VISION_RANGE = 50; // meters
@@ -64,6 +66,13 @@ export class HarkonnenAI {
 
   constructor() {
     this.combatSystem = new CombatSystem();
+  }
+
+  /**
+   * Set alert system for coordination
+   */
+  setAlertSystem(alertSystem: AlertSystem): void {
+    this.alertSystem = alertSystem;
   }
 
   /**
@@ -151,6 +160,25 @@ export class HarkonnenAI {
     deltaTime: number,
     now: number
   ): void {
+    // Check for alerts from other troopers
+    if (this.alertSystem) {
+      const alerts = this.alertSystem.getAlertsForTrooper(
+        trooper.id,
+        trooper.position,
+        trooper.outpostId
+      );
+
+      if (alerts.length > 0) {
+        // Respond to nearest alert
+        const nearestAlert = alerts[0];
+        trooper.state = HarkonnenState.INVESTIGATE;
+        trooper.lastKnownPlayerPosition = nearestAlert.position;
+        trooper.investigateUntil = now + this.INVESTIGATE_DURATION;
+        console.log(`Trooper ${trooper.id} responding to alert from ${nearestAlert.alertingTrooperId}, INVESTIGATING`);
+        return;
+      }
+    }
+
     // Check for player detection
     const detection = this.detectPlayers(trooper, players);
     if (detection.detected) {
@@ -158,6 +186,17 @@ export class HarkonnenAI {
       trooper.targetPlayerId = detection.playerId;
       trooper.lastKnownPlayerPosition = detection.position;
       trooper.alertedAt = now;
+
+      // Broadcast alert to nearby troopers
+      if (this.alertSystem && detection.playerId && detection.position) {
+        this.alertSystem.broadcastAlert(
+          trooper.id,
+          detection.playerId,
+          detection.position,
+          trooper.outpostId
+        );
+      }
+
       console.log(`Trooper ${trooper.id} detected player ${detection.playerId}, entering COMBAT`);
       return;
     }
@@ -201,6 +240,17 @@ export class HarkonnenAI {
       trooper.state = HarkonnenState.COMBAT;
       trooper.targetPlayerId = detection.playerId;
       trooper.lastKnownPlayerPosition = detection.position;
+
+      // Broadcast alert to nearby troopers
+      if (this.alertSystem && detection.playerId && detection.position) {
+        this.alertSystem.broadcastAlert(
+          trooper.id,
+          detection.playerId,
+          detection.position,
+          trooper.outpostId
+        );
+      }
+
       console.log(`Trooper ${trooper.id} re-acquired target, entering COMBAT`);
       return;
     }

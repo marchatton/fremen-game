@@ -7,7 +7,7 @@
 ## Quick Stats
 
 - **Total Commits**: 30+
-- **Test Coverage**: 686 tests (100% passing) ✅
+- **Test Coverage**: 727 tests (100% passing) ✅
 - **Build Status**: All packages compile ✅
 - **Playable**: Yes - complete resource loop with survival mechanics ✅
 
@@ -75,15 +75,16 @@
 
 **Duration**: ~1 day actual
 
-### 🔨 VS4: PvE Combat (In Progress - 4/11)
+### 🔨 VS4: PvE Combat (In Progress - 5/11)
 
-**Completed (4/11)**:
+**Completed (5/11)**:
 1. ✅ HarkonnenAI - AI state machine with vision, patrol, combat, investigate, retreat states (47 tests)
 2. ✅ CombatSystem - Shooting mechanics, hit detection, damage calculation (53 tests)
 3. ✅ Player Shooting - Server-side shooting handler, damage to Harkonnen (16 integration tests)
 4. ✅ Outpost System - Procedural outpost placement, trooper spawning, patrol paths (40 tests)
+5. ✅ Alert System - Harkonnen coordination via alerts when detecting players (30 unit + 11 integration tests)
 
-**Test Coverage**: 174 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager + 18 OutpostIntegration)
+**Test Coverage**: 215 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager + 18 OutpostIntegration + 30 AlertSystem + 11 AlertIntegration)
 
 **Combat Features**:
 - Weapon stats: damage, fire rate, range, accuracy
@@ -103,9 +104,17 @@
 - Outpost clearing (deactivates when all troopers killed)
 - Deterministic placement (same seed = same positions)
 
+**Alert System Features**:
+- Troopers broadcast alerts when detecting players
+- Alert radius: 300m same outpost, 500m cross-outpost
+- Alert cooldown: 5 seconds per trooper
+- Alert duration: 30 seconds
+- Nearby troopers respond to alerts by investigating
+- Troopers transition: PATROL → INVESTIGATE → PATROL or COMBAT
+- Complete end-to-end alert workflow with expiration
+
 **Planned**:
-5. ⏳ Patrol Routes - Enhanced AI patrol behavior
-6. ⏳ Alert System - Harkonnen coordination on detection
+6. ⏳ Patrol Routes - Enhanced AI patrol behavior
 7. ⏳ Thumper Jamming - Harkonnen can disable thumpers
 8. ⏳ Loot Drops - Spice/equipment from killed Harkonnen
 9. ⏳ Difficulty Scaling - More Harkonnen over time
@@ -128,7 +137,7 @@
 - ✅ TypeScript strict mode across all packages
 - ✅ ESLint + shared configs
 - ✅ GitHub Actions CI (lint + typecheck)
-- ✅ Comprehensive test suite (512 tests, 100% passing)
+- ✅ Comprehensive test suite (727 tests, 100% passing)
 
 ### Networking
 - ✅ Socket.io with JWT auth
@@ -219,13 +228,14 @@ pnpm run build
 - ✅ Core worm riding loop playable
 - ✅ Complete resource loop implemented
 - ✅ 60fps performance
-- ✅ 686 tests passing (100%)
+- ✅ 727 tests passing (100%)
 - ✅ Smooth movement
 - ✅ All VS3 systems integrated
 - ✅ VS4 HarkonnenAI complete (47 tests)
 - ✅ VS4 CombatSystem complete (53 tests)
 - ✅ VS4 Player Shooting complete (16 tests)
 - ✅ VS4 Outpost System complete (40 unit + 18 integration tests)
+- ✅ VS4 Alert System complete (30 unit + 11 integration tests)
 - ✅ Bi-directional combat (Harkonnen ↔ Player)
 
 **To Validate**:
@@ -235,4 +245,4 @@ pnpm run build
 
 ---
 
-**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat in progress with 4/11 deliverables complete: HarkonnenAI (47 tests), CombatSystem (53 tests), Player Shooting (16 tests), and Outpost System (40 tests). Harkonnen troopers now spawn at 6 procedurally placed outposts with octagonal patrol paths. Ready to continue VS4 with enhanced patrol behavior or alert systems.
+**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat in progress with 5/11 deliverables complete: HarkonnenAI (47 tests), CombatSystem (53 tests), Player Shooting (16 tests), Outpost System (40 tests), and Alert System (30 unit + 11 integration tests). Harkonnen troopers now spawn at 6 procedurally placed outposts with octagonal patrol paths and coordinate via alerts when detecting players. Troopers broadcast alerts (300m radius same outpost, 500m cross-outpost) that trigger nearby troopers to investigate. Ready to continue VS4 with Thumper Jamming or Loot Drops.
