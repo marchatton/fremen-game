@@ -259,27 +259,38 @@ export class GameLoop {
       position: p.state.position,
       state: p.state.state,
     }));
-    this.harkonnenAI.update(deltaTime, playerData);
+    const thumperData = this.room.getActiveThumpers().map(t => ({
+      id: t.id,
+      position: t.position,
+      active: t.active,
+    }));
+    this.harkonnenAI.update(deltaTime, playerData, thumperData);
 
     // VS4: Cleanup expired alerts
     this.alertSystem.cleanup();
 
-    // VS4: Apply Harkonnen damage to players
+    // VS4: Apply Harkonnen damage to players and thumpers
     const shots = this.harkonnenAI.getShotsFired();
     for (const shot of shots) {
       if (shot.hit && shot.targetId) {
-        const player = this.room.getPlayer(shot.targetId);
-        if (player && player.state.state !== PlayerStateEnum.DEAD) {
-          const damageResult = this.combatSystem.applyDamage(
-            player.health,
-            shot.damage,
-            shot.targetId
-          );
+        // Check if target is a thumper
+        if (shot.targetType === 'thumper') {
+          this.room.damageThumper(shot.targetId, shot.damage);
+        } else {
+          // Target is a player
+          const player = this.room.getPlayer(shot.targetId);
+          if (player && player.state.state !== PlayerStateEnum.DEAD) {
+            const damageResult = this.combatSystem.applyDamage(
+              player.health,
+              shot.damage,
+              shot.targetId
+            );
 
-          player.health = damageResult.healthRemaining;
+            player.health = damageResult.healthRemaining;
 
-          if (damageResult.killed) {
-            this.handlePlayerDeath(player.playerId);
+            if (damageResult.killed) {
+              this.handlePlayerDeath(player.playerId);
+            }
           }
         }
       }

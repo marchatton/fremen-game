@@ -4,6 +4,7 @@ import { GameLoop } from './GameLoop';
 import type { RoomPlayer } from './Room';
 import { HarkonnenState } from './ai/HarkonnenAI';
 import type { Socket } from 'socket.io';
+import type { Vector3 } from '@fremen/shared';
 
 /**
  * VS4: Alert System Integration Tests

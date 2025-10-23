@@ -42,4 +42,5 @@ export interface ThumperState {
   position: Vector3;
   active: boolean;
   expiresAt: number;
+  health: number; // VS4: Thumper health for jamming system
 }

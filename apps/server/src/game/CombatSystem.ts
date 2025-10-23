@@ -17,6 +17,7 @@ export interface ShootResult {
   damage: number;
   distance: number;
   targetId?: string;
+  targetType?: 'player' | 'thumper'; // VS4: Thumper jamming support
 }
 
 export interface DamageResult {

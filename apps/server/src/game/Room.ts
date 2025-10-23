@@ -121,6 +121,7 @@ export class Room {
       position: { ...player.state.position },
       active: true,
       expiresAt: Date.now() + GAME_CONSTANTS.THUMPER_DURATION,
+      health: 100, // VS4: Thumper starts with full health
     };
 
     this.thumpers.set(thumperId, thumper);
@@ -147,5 +148,33 @@ export class Room {
 
   getActiveThumpers(): ThumperState[] {
     return Array.from(this.thumpers.values()).filter(t => t.active);
+  }
+
+  /**
+   * VS4: Damage a thumper
+   * Returns true if thumper was damaged, false if thumper doesn't exist
+   */
+  damageThumper(thumperId: string, damage: number): boolean {
+    const thumper = this.thumpers.get(thumperId);
+    if (!thumper) {
+      return false;
+    }
+
+    thumper.health -= damage;
+
+    if (thumper.health <= 0) {
+      thumper.health = 0;
+      thumper.active = false;
+      console.log(`Thumper ${thumperId} destroyed`);
+    }
+
+    return true;
+  }
+
+  /**
+   * VS4: Get a specific thumper
+   */
+  getThumper(thumperId: string): ThumperState | undefined {
+    return this.thumpers.get(thumperId);
   }
 }
