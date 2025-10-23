@@ -13,6 +13,7 @@ import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
 import { CombatSystem, WeaponType } from './CombatSystem';
 import { HarkonnenAI, HarkonnenState } from './ai/HarkonnenAI';
+import { OutpostManager } from './OutpostManager';
 
 export class GameLoop {
   private room: Room;
@@ -33,6 +34,7 @@ export class GameLoop {
   // VS4 Systems
   private combatSystem: CombatSystem;
   private harkonnenAI: HarkonnenAI;
+  private outpostManager: OutpostManager;
 
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -64,8 +66,42 @@ export class GameLoop {
     // Initialize VS4 systems
     this.combatSystem = new CombatSystem();
     this.harkonnenAI = new HarkonnenAI();
+    this.outpostManager = new OutpostManager(seed);
+
+    // Generate outposts and spawn Harkonnen
+    const oasisPositions = this.oasisManager.getOases().map(o => o.position);
+    this.outpostManager.generateOutposts(oasisPositions);
+    this.spawnHarkonnenAtOutposts();
 
     console.log('VS4 systems initialized');
+  }
+
+  /**
+   * VS4: Spawn Harkonnen troopers at all outposts
+   */
+  private spawnHarkonnenAtOutposts(): void {
+    const outposts = this.outpostManager.getOutposts();
+
+    for (const outpost of outposts) {
+      const trooperCount = this.outpostManager.getTrooperCountForOutpost(outpost.id);
+      const patrolPath = this.outpostManager.generatePatrolPath(outpost.id);
+
+      for (let i = 0; i < trooperCount; i++) {
+        const trooperId = `${outpost.id}-trooper-${i}`;
+
+        this.harkonnenAI.spawnTrooper(
+          trooperId,
+          outpost.position,
+          patrolPath.waypoints,
+          outpost.id
+        );
+
+        this.outpostManager.addTrooperToOutpost(outpost.id, trooperId);
+      }
+    }
+
+    const stats = this.outpostManager.getOutpostStats();
+    console.log(`Spawned ${stats.totalTroopers} Harkonnen troopers across ${stats.total} outposts`);
   }
 
   start() {
@@ -405,6 +441,14 @@ export class GameLoop {
     if (shootResult.hit && shootResult.targetId) {
       // Apply damage to Harkonnen
       const killed = this.harkonnenAI.applyDamage(shootResult.targetId, shootResult.damage);
+
+      // VS4: Remove trooper from outpost when killed
+      if (killed) {
+        const trooper = this.harkonnenAI.getTrooper(shootResult.targetId);
+        if (trooper && trooper.outpostId) {
+          this.outpostManager.removeTrooperFromOutpost(trooper.outpostId, shootResult.targetId);
+        }
+      }
 
       console.log(`Player ${playerId} ${killed ? 'killed' : 'hit'} Harkonnen ${shootResult.targetId} for ${shootResult.damage} damage`);
 

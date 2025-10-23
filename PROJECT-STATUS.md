@@ -7,7 +7,7 @@
 ## Quick Stats
 
 - **Total Commits**: 30+
-- **Test Coverage**: 628 tests (100% passing) ✅
+- **Test Coverage**: 668 tests (100% passing) ✅
 - **Build Status**: All packages compile ✅
 - **Playable**: Yes - complete resource loop with survival mechanics ✅
 
@@ -75,14 +75,15 @@
 
 **Duration**: ~1 day actual
 
-### 🔨 VS4: PvE Combat (In Progress - 3/11)
+### 🔨 VS4: PvE Combat (In Progress - 4/11)
 
-**Completed (3/11)**:
+**Completed (4/11)**:
 1. ✅ HarkonnenAI - AI state machine with vision, patrol, combat, investigate, retreat states (47 tests)
 2. ✅ CombatSystem - Shooting mechanics, hit detection, damage calculation (53 tests)
 3. ✅ Player Shooting - Server-side shooting handler, damage to Harkonnen (16 integration tests)
+4. ✅ Outpost System - Procedural outpost placement, trooper spawning, patrol paths (40 tests)
 
-**Test Coverage**: 116 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting)
+**Test Coverage**: 156 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager)
 
 **Combat Features**:
 - Weapon stats: damage, fire rate, range, accuracy
@@ -94,9 +95,16 @@
 - Target selection (nearest to aim point within 5m)
 - Full kill tracking (players can kill Harkonnen)
 
+**Outpost Features**:
+- 6 procedurally placed outposts with seeded random
+- Min 200m between outposts, 300m from Sietch, 150m from oases
+- 2-4 troopers per outpost (12-24 total)
+- Octagonal patrol paths (8 waypoints at 50m radius)
+- Outpost clearing (deactivates when all troopers killed)
+- Deterministic placement (same seed = same positions)
+
 **Planned**:
-4. ⏳ Outpost System - Harkonnen spawn points
-5. ⏳ Patrol Routes - Procedural or fixed patrol paths
+5. ⏳ Patrol Routes - Enhanced AI patrol behavior
 6. ⏳ Alert System - Harkonnen coordination on detection
 7. ⏳ Thumper Jamming - Harkonnen can disable thumpers
 8. ⏳ Loot Drops - Spice/equipment from killed Harkonnen
@@ -211,12 +219,13 @@ pnpm run build
 - ✅ Core worm riding loop playable
 - ✅ Complete resource loop implemented
 - ✅ 60fps performance
-- ✅ 628 tests passing (100%)
+- ✅ 668 tests passing (100%)
 - ✅ Smooth movement
 - ✅ All VS3 systems integrated
 - ✅ VS4 HarkonnenAI complete (47 tests)
 - ✅ VS4 CombatSystem complete (53 tests)
 - ✅ VS4 Player Shooting complete (16 tests)
+- ✅ VS4 Outpost System complete (40 tests)
 - ✅ Bi-directional combat (Harkonnen ↔ Player)
 
 **To Validate**:
@@ -226,4 +235,4 @@ pnpm run build
 
 ---
 
-**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat started with HarkonnenAI system complete (47 tests). Resource loop with spice harvesting, water survival, equipment, merchant trading, and death/respawn fully implemented and tested. Ready to continue VS4 with Health/Combat systems or client-side VS3 integration.
+**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat in progress with 4/11 deliverables complete: HarkonnenAI (47 tests), CombatSystem (53 tests), Player Shooting (16 tests), and Outpost System (40 tests). Harkonnen troopers now spawn at 6 procedurally placed outposts with octagonal patrol paths. Ready to continue VS4 with enhanced patrol behavior or alert systems.
