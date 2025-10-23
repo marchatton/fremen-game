@@ -7,7 +7,7 @@
 ## Quick Stats
 
 - **Total Commits**: 25+
-- **Test Coverage**: 512 tests (100% passing) ✅
+- **Test Coverage**: 559 tests (100% passing) ✅
 - **Build Status**: All packages compile ✅
 - **Playable**: Yes - complete resource loop with survival mechanics ✅
 
@@ -75,10 +75,24 @@
 
 **Duration**: ~1 day actual
 
-### 📋 VS4: PvE Combat (Not Started)
-- Harkonnen patrols
-- Combat system
-- Thumper jamming
+### 🔨 VS4: PvE Combat (In Progress - 1/3)
+
+**Completed (1/11)**:
+1. ✅ HarkonnenAI - AI state machine with vision, patrol, combat, investigate, retreat states (47 tests)
+
+**Test Coverage**: 47 unit tests
+
+**Planned**:
+2. ⏳ Health System - Player/Harkonnen damage, death
+3. ⏳ Combat System - Shooting mechanics, hit detection
+4. ⏳ Outpost System - Harkonnen spawn points
+5. ⏳ Patrol Routes - Procedural or fixed patrol paths
+6. ⏳ Alert System - Harkonnen coordination on detection
+7. ⏳ Thumper Jamming - Harkonnen can disable thumpers
+8. ⏳ Loot Drops - Spice/equipment from killed Harkonnen
+9. ⏳ Difficulty Scaling - More Harkonnen over time
+10. ⏳ Integration Tests - Complete combat scenarios
+11. ⏳ Documentation
 
 ### 📋 VS5: Squad Cooperation (Not Started)
 - Role specialization
@@ -169,7 +183,7 @@ pnpm run build
 
 ## Next Steps
 
-1. **VS4: PvE Combat** - Harkonnen patrols and combat system
+1. **VS4: PvE Combat** - Continue with Health/Combat systems (HarkonnenAI complete ✅)
 2. **Client Integration** - Wire up VS3 UI and network messages
 3. **Playtesting** - Validate resource loop fun factor
 4. **Balance** - Tune water depletion rates and rewards
@@ -187,9 +201,10 @@ pnpm run build
 - ✅ Core worm riding loop playable
 - ✅ Complete resource loop implemented
 - ✅ 60fps performance
-- ✅ 512 tests passing (100%)
+- ✅ 559 tests passing (100%)
 - ✅ Smooth movement
 - ✅ All VS3 systems integrated
+- ✅ VS4 HarkonnenAI complete with 47 tests
 
 **To Validate**:
 - ❓ Fun factor (playtester feedback)
@@ -198,4 +213,4 @@ pnpm run build
 
 ---
 
-**Conclusion**: VS1, VS2, and VS3 fully complete on the server. Resource loop with spice harvesting, water survival, equipment, merchant trading, and death/respawn fully implemented and tested. Ready for VS4 PvE Combat or client-side VS3 integration.
+**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat started with HarkonnenAI system complete (47 tests). Resource loop with spice harvesting, water survival, equipment, merchant trading, and death/respawn fully implemented and tested. Ready to continue VS4 with Health/Combat systems or client-side VS3 integration.

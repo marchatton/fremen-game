@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Room } from './Room';
 import { GameLoop } from './GameLoop';
 import type { RoomPlayer } from './Room';
-import { PlayerStateEnum, ECONOMY_CONSTANTS } from '@fremen/shared';
+import { PlayerStateEnum, ECONOMY_CONSTANTS, EquipmentType, EQUIPMENT_CATALOG } from '@fremen/shared';
 import type { Socket } from 'socket.io';
 
 describe('VS3: Resource Loop Integration (End-to-End)', () => {
@@ -183,16 +183,8 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
     });
 
     it('should reduce water depletion with stillsuit equipped', () => {
-      // Equip basic stillsuit
-      const stillsuit = {
-        id: 'basic-stillsuit',
-        type: 'STILLSUIT' as const,
-        tier: 'BASIC' as const,
-        name: 'Basic Stillsuit',
-        description: 'Test',
-        stats: { waterReduction: 0.25 }
-      };
-      player.resources.equipment.body = stillsuit;
+      // Equip basic stillsuit from catalog
+      player.resources.equipment.body = EQUIPMENT_CATALOG['basic-stillsuit'];
 
       player.resources.water = 100;
 
@@ -353,8 +345,8 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       // Clear inventory and add only stillsuit
       player.resources.inventory = [{
         id: 'inv-1',
-        type: 'STILLSUIT' as const,
-        tier: 'BASIC' as const,
+        type: EquipmentType.STILLSUIT,
+        tier: EQUIPMENT_CATALOG['basic-stillsuit'].tier,
         quantity: 1
       }];
       player.resources.spice = 0;
@@ -377,8 +369,8 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       // Clear inventory and add only stillsuit
       player.resources.inventory = [{
         id: 'inv-1',
-        type: 'STILLSUIT' as const,
-        tier: 'BASIC' as const,
+        type: EquipmentType.STILLSUIT,
+        tier: EQUIPMENT_CATALOG['basic-stillsuit'].tier,
         quantity: 1
       }];
 
@@ -671,14 +663,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   describe('Multi-System Interactions', () => {
     it('should reduce water loss significantly with advanced stillsuit', () => {
       // Equip advanced stillsuit (75% reduction)
-      player.resources.equipment.body = {
-        id: 'advanced-stillsuit',
-        type: 'STILLSUIT' as const,
-        tier: 'ADVANCED' as const,
-        name: 'Advanced Stillsuit',
-        description: 'Test',
-        stats: { waterReduction: 0.75 }
-      };
+      player.resources.equipment.body = EQUIPMENT_CATALOG['advanced-stillsuit'];
 
       player.resources.water = 100;
 
@@ -720,8 +705,8 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       // Start with basic stillsuit in inventory
       player.resources.inventory = [{
         id: 'inv-1',
-        type: 'STILLSUIT' as const,
-        tier: 'BASIC' as const,
+        type: EquipmentType.STILLSUIT,
+        tier: EQUIPMENT_CATALOG['basic-stillsuit'].tier,
         quantity: 1
       }];
       player.resources.spice = 200; // Need enough for improved (200 spice)
