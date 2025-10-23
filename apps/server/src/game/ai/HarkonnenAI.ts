@@ -1,4 +1,5 @@
 import type { Vector3 } from '@fremen/shared';
+import { CombatSystem, WeaponType, type ShootResult } from '../CombatSystem';
 
 export enum HarkonnenState {
   PATROL = 'PATROL',
@@ -45,6 +46,8 @@ interface DetectionResult {
  */
 export class HarkonnenAI {
   private troopers: Map<string, HarkonnenTrooper> = new Map();
+  private combatSystem: CombatSystem;
+  private shotsFired: ShootResult[] = [];
 
   // AI Configuration
   private readonly VISION_RANGE = 50; // meters
@@ -58,6 +61,10 @@ export class HarkonnenAI {
   private readonly PATROL_SPEED = 3; // m/s
   private readonly COMBAT_SPEED = 5; // m/s
   private readonly CORPSE_DURATION = 30000; // 30 seconds
+
+  constructor() {
+    this.combatSystem = new CombatSystem();
+  }
 
   /**
    * Spawn a new Harkonnen trooper
@@ -92,6 +99,9 @@ export class HarkonnenAI {
    */
   update(deltaTime: number, players: Array<{ id: string; position: Vector3; state: string }>): void {
     const now = Date.now();
+
+    // Clear shots from previous update
+    this.shotsFired = [];
 
     for (const trooper of this.troopers.values()) {
       if (trooper.state === HarkonnenState.DEAD) {
@@ -256,7 +266,7 @@ export class HarkonnenAI {
 
     // Fire at player if LOS and fire rate allows
     if (hasLOS && now - trooper.lastFireTime > this.FIRE_RATE) {
-      this.fireAtPlayer(trooper, target.position, now);
+      this.fireAtPlayer(trooper, target.position, target.id, now);
     }
 
     // Face target
@@ -349,12 +359,26 @@ export class HarkonnenAI {
   }
 
   /**
-   * Fire at player (stub for combat system integration)
+   * Fire at player using combat system
    */
-  private fireAtPlayer(trooper: HarkonnenTrooper, targetPos: Vector3, now: number): void {
+  private fireAtPlayer(trooper: HarkonnenTrooper, targetPos: Vector3, targetId: string, now: number): void {
     trooper.lastFireTime = now;
-    // TODO: Integrate with combat system to apply damage
-    console.log(`Trooper ${trooper.id} fired at target`);
+
+    const hasLOS = this.hasLineOfSight(trooper.position, targetPos);
+    const shootResult = this.combatSystem.harkonnenShoot(
+      trooper.position,
+      targetPos,
+      targetId,
+      hasLOS
+    );
+
+    // Store shot result for GameLoop to process
+    if (shootResult.hit) {
+      this.shotsFired.push(shootResult);
+      console.log(`Trooper ${trooper.id} hit ${targetId} for ${shootResult.damage} damage`);
+    } else {
+      console.log(`Trooper ${trooper.id} fired at ${targetId} but missed`);
+    }
   }
 
   /**
@@ -469,5 +493,12 @@ export class HarkonnenAI {
     return Array.from(this.troopers.values()).filter(
       t => t.targetPlayerId === playerId && t.state === HarkonnenState.COMBAT
     );
+  }
+
+  /**
+   * Get shots fired this update (for GameLoop to apply damage)
+   */
+  getShotsFired(): ShootResult[] {
+    return [...this.shotsFired];
   }
 }

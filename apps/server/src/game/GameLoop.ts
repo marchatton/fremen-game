@@ -11,6 +11,8 @@ import { EquipmentManager } from './EquipmentManager';
 import { SietchManager } from './SietchManager';
 import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
+import { CombatSystem } from './CombatSystem';
+import { HarkonnenAI } from './ai/HarkonnenAI';
 
 export class GameLoop {
   private room: Room;
@@ -27,6 +29,10 @@ export class GameLoop {
   private sietchManager: SietchManager;
   private rewardManager: RewardManager;
   private deathManager: DeathManager;
+
+  // VS4 Systems
+  private combatSystem: CombatSystem;
+  private harkonnenAI: HarkonnenAI;
 
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -54,6 +60,12 @@ export class GameLoop {
     this.oasisManager.generateOases();
 
     console.log('VS3 systems initialized');
+
+    // Initialize VS4 systems
+    this.combatSystem = new CombatSystem();
+    this.harkonnenAI = new HarkonnenAI();
+
+    console.log('VS4 systems initialized');
   }
 
   start() {
@@ -195,6 +207,35 @@ export class GameLoop {
         if (died && worm.riderId) {
           this.handleDismount(worm.riderId);
           console.log(`Worm ${worm.id} died, ejecting rider`);
+        }
+      }
+    }
+
+    // VS4: Update Harkonnen AI
+    const playerData = players.map(p => ({
+      id: p.playerId,
+      position: p.state.position,
+      state: p.state.state,
+    }));
+    this.harkonnenAI.update(deltaTime, playerData);
+
+    // VS4: Apply Harkonnen damage to players
+    const shots = this.harkonnenAI.getShotsFired();
+    for (const shot of shots) {
+      if (shot.hit && shot.targetId) {
+        const player = this.room.getPlayer(shot.targetId);
+        if (player && player.state.state !== PlayerStateEnum.DEAD) {
+          const damageResult = this.combatSystem.applyDamage(
+            player.health,
+            shot.damage,
+            shot.targetId
+          );
+
+          player.health = damageResult.healthRemaining;
+
+          if (damageResult.killed) {
+            this.handlePlayerDeath(player.playerId);
+          }
         }
       }
     }
