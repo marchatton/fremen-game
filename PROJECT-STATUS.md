@@ -7,7 +7,7 @@
 ## Quick Stats
 
 - **Total Commits**: 30+
-- **Test Coverage**: 668 tests (100% passing) ✅
+- **Test Coverage**: 686 tests (100% passing) ✅
 - **Build Status**: All packages compile ✅
 - **Playable**: Yes - complete resource loop with survival mechanics ✅
 
@@ -83,7 +83,7 @@
 3. ✅ Player Shooting - Server-side shooting handler, damage to Harkonnen (16 integration tests)
 4. ✅ Outpost System - Procedural outpost placement, trooper spawning, patrol paths (40 tests)
 
-**Test Coverage**: 156 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager)
+**Test Coverage**: 174 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager + 18 OutpostIntegration)
 
 **Combat Features**:
 - Weapon stats: damage, fire rate, range, accuracy
@@ -219,13 +219,13 @@ pnpm run build
 - ✅ Core worm riding loop playable
 - ✅ Complete resource loop implemented
 - ✅ 60fps performance
-- ✅ 668 tests passing (100%)
+- ✅ 686 tests passing (100%)
 - ✅ Smooth movement
 - ✅ All VS3 systems integrated
 - ✅ VS4 HarkonnenAI complete (47 tests)
 - ✅ VS4 CombatSystem complete (53 tests)
 - ✅ VS4 Player Shooting complete (16 tests)
-- ✅ VS4 Outpost System complete (40 tests)
+- ✅ VS4 Outpost System complete (40 unit + 18 integration tests)
 - ✅ Bi-directional combat (Harkonnen ↔ Player)
 
 **To Validate**:

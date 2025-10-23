@@ -513,4 +513,19 @@ export class GameLoop {
 
     console.log(`Player ${playerId} completed objective: +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE} spice, +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_WATER} water`);
   }
+
+  /**
+   * Public accessors for testing
+   */
+  getOutpostManager(): OutpostManager {
+    return this.outpostManager;
+  }
+
+  getHarkonnenAI(): HarkonnenAI {
+    return this.harkonnenAI;
+  }
+
+  getOasisManager(): OasisManager {
+    return this.oasisManager;
+  }
 }
