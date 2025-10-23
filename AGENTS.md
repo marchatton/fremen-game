@@ -71,6 +71,7 @@ integration.test.ts  # server integration tests
 - Broadcasts must include `lastProcessedInputSeq`; reconciliation logic expects it.
 - Wrap resource persistence in transactions; Drizzle helpers live in `apps/server/src/db`.
 - When adding protocol messages or entities, follow the documented steps (update shared types, server logic, client visuals, tests, docs).
+- Audit interest-management and broadcast frequency changes against `docs/02-network-protocol.md` and capture deltas in the protocol docs whenever thresholds shift.
 
 ---
 
@@ -84,6 +85,7 @@ integration.test.ts  # server integration tests
 - Add or update Vitest suites (server + shared) for game loop, worm AI, resource logic.
 - Reuse `TerrainGenerator` + constants from `@fremen/shared`; avoid duplicating math in client/server.
 - Document any protocol/schema changes in `docs/02-network-protocol.md` and regenerate diagrams if needed.
+- Note manual playtest expectations by updating `TESTING.md` whenever sandbox steps change (e.g. new HUD flow or riding controls).
 
 **Don’t**
 
@@ -165,4 +167,3 @@ pnpm --filter @fremen/server typecheck
 - **Shared:** Terrain generator + utility tests live in `packages/shared`; extend when changing constants/math.
 - **Client:** Future Three.js/unit tests reside in `apps/client/src/tests`; at minimum run manual HMR session per `TESTING.md` when touching rendering/input.
 - **Rule:** bug → failing test → fix → green. Keep integration tests fast (<5 s) and deterministic (no randomness without seeding).
-

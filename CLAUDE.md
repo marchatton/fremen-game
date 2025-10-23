@@ -77,6 +77,7 @@ auth/           # JWT helpers
 * Reconcile inputs using `lastProcessedInputSeq`; keep broadcast payloads compatible with client expectations.
 * When persistence is involved, use `db/persistence.ts` helpers (transactions, autosave manager) and update `.env.example`.
 * Protocol or gameplay changes must be mirrored in docs (`docs/02-network-protocol.md`, milestone summaries).
+* Reflect interest-management or tick-rate adjustments in the protocol docs so other agents stay aligned with bandwidth/CPU targets.
 
 ---
 
@@ -89,6 +90,7 @@ auth/           # JWT helpers
 * Add/update Vitest suites for worm AI, mount/dismount, objective flow, resource systems.
 * Keep shared constants single-sourced in `packages/shared/src/constants`.
 * Run manual sandbox checks per `TESTING.md` when touching client render/input loops.
+* Amend `TESTING.md` when procedural changes alter the sandbox walkthrough (new objectives, UI prompts, etc.).
 
 **Don't**
 
@@ -152,4 +154,3 @@ Use Claude shell commands sparingly and prefer `pnpm --filter ...` rather than m
 * **Shared:** Terrain generator + resource constants should stay deterministic; update tests alongside changes.
 * **Client:** Manual sandbox walkthrough per `TESTING.md`; add unit/integration tests under `apps/client/src/tests` when client logic grows.
 * **Rule:** bug → failing test → fix → green. Keep tests fast (<5 s) and seeded when randomness is involved.
-
