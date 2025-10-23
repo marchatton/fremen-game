@@ -214,12 +214,33 @@ export class GameLoop {
           distance
         );
       }
+
+      // VS4: Auto-collect nearby loot drops
+      if (player.state.state !== PlayerStateEnum.DEAD) {
+        const lootDrops = this.room.getLootDrops();
+        for (const loot of lootDrops) {
+          const lootDistance = Math.sqrt(
+            Math.pow(player.state.position.x - loot.position.x, 2) +
+            Math.pow(player.state.position.z - loot.position.z, 2)
+          );
+
+          // Auto-collect within 5m radius
+          if (lootDistance <= 5) {
+            const collected = this.room.collectLoot(loot.id, player.playerId);
+            if (collected > 0) {
+              console.log(`Player ${player.username} auto-collected ${collected} spice`);
+            }
+          }
+        }
+      }
     }
 
     // VS3: Update spice harvesting
     this.spiceManager.update(deltaTime);
 
+    // VS4: Update thumpers and loot drops
     this.room.updateThumpers();
+    this.room.updateLoot();
     
     const activeThumpers = this.room.getActiveThumpers();
     for (const thumper of activeThumpers) {
@@ -301,8 +322,9 @@ export class GameLoop {
     const players = this.room.getAllPlayers();
     const worms = this.wormAI.getWorms();
     const thumpers = this.room.getThumpers();
+    const lootDrops = this.room.getLootDrops(); // VS4: Loot drops
     const objective = this.objectiveManager.getActiveObjective();
-    
+
     for (const player of players) {
       const stateMessage = {
         type: 'S_STATE',
@@ -311,6 +333,7 @@ export class GameLoop {
         players: players.map(p => p.state),
         worms,
         thumpers,
+        lootDrops, // VS4: Include loot drops in state
         objective: objective ? {
           id: objective.id,
           type: objective.type,
@@ -320,7 +343,7 @@ export class GameLoop {
           status: objective.status,
         } : undefined,
       };
-      
+
       player.socket.emit('state', stateMessage);
     }
   }
@@ -460,17 +483,21 @@ export class GameLoop {
 
     if (shootResult.hit && shootResult.targetId) {
       // Apply damage to Harkonnen
-      const killed = this.harkonnenAI.applyDamage(shootResult.targetId, shootResult.damage);
+      const damageResult = this.harkonnenAI.applyDamage(shootResult.targetId, shootResult.damage);
 
-      // VS4: Remove trooper from outpost when killed
-      if (killed) {
+      // VS4: Remove trooper from outpost when killed and spawn loot
+      if (damageResult.killed && damageResult.position) {
         const trooper = this.harkonnenAI.getTrooper(shootResult.targetId);
         if (trooper && trooper.outpostId) {
           this.outpostManager.removeTrooperFromOutpost(trooper.outpostId, shootResult.targetId);
         }
+
+        // VS4: Spawn loot drop at trooper death position
+        const spiceAmount = Math.floor(Math.random() * 21) + 10; // 10-30 spice
+        this.room.spawnLoot(damageResult.position, spiceAmount);
       }
 
-      console.log(`Player ${playerId} ${killed ? 'killed' : 'hit'} Harkonnen ${shootResult.targetId} for ${shootResult.damage} damage`);
+      console.log(`Player ${playerId} ${damageResult.killed ? 'killed' : 'hit'} Harkonnen ${shootResult.targetId} for ${shootResult.damage} damage`);
 
       return {
         success: true,

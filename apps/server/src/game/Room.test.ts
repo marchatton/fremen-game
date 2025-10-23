@@ -115,18 +115,128 @@ describe('Room', () => {
   it('should restore player state on reconnect', () => {
     const socket1 = { ...mockSocket, id: 'socket-1' } as Socket;
     room.addPlayer(socket1, 'player1', 'TestPlayer');
-    
+
     const player = room.getPlayer('player1');
     if (player) {
       player.state.position = { x: 100, y: 0, z: 100 };
     }
-    
+
     room.removePlayer('player1');
-    
+
     const socket2 = { ...mockSocket, id: 'socket-2' } as Socket;
     room.addPlayer(socket2, 'player1', 'TestPlayer');
-    
+
     const restoredPlayer = room.getPlayer('player1');
     expect(restoredPlayer?.state.position.x).toBe(100);
+  });
+
+  // VS4: Loot Drop Tests
+  describe('Loot Drops', () => {
+    it('should spawn loot at position', () => {
+      const position = { x: 100, y: 0, z: 100 };
+      const loot = room.spawnLoot(position, 25);
+
+      expect(loot).toBeDefined();
+      expect(loot.position).toEqual(position);
+      expect(loot.spice).toBe(25);
+      expect(loot.expiresAt).toBeGreaterThan(Date.now());
+
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+      expect(lootDrops[0].id).toBe(loot.id);
+    });
+
+    it('should collect loot and add spice to player', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      const player = room.getPlayer('player1');
+      const initialSpice = player!.resources.spice;
+
+      const loot = room.spawnLoot({ x: 100, y: 0, z: 100 }, 25);
+      const collected = room.collectLoot(loot.id, 'player1');
+
+      expect(collected).toBe(25);
+      expect(player!.resources.spice).toBe(initialSpice + 25);
+
+      // Loot should be removed after collection
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(0);
+    });
+
+    it('should not collect loot with invalid loot id', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      const collected = room.collectLoot('invalid-id', 'player1');
+
+      expect(collected).toBe(0);
+    });
+
+    it('should not collect loot with invalid player id', () => {
+      const loot = room.spawnLoot({ x: 100, y: 0, z: 100 }, 25);
+      const collected = room.collectLoot(loot.id, 'invalid-player');
+
+      expect(collected).toBe(0);
+
+      // Loot should still exist
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+    });
+
+    it('should expire old loot drops', () => {
+      vi.useFakeTimers();
+
+      room.spawnLoot({ x: 100, y: 0, z: 100 }, 25);
+
+      let lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+
+      // Advance time past expiration (60 seconds)
+      vi.advanceTimersByTime(61000);
+      room.updateLoot();
+
+      lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(0);
+
+      vi.useRealTimers();
+    });
+
+    it('should not expire loot before expiration time', () => {
+      vi.useFakeTimers();
+
+      room.spawnLoot({ x: 100, y: 0, z: 100 }, 25);
+
+      // Advance time but not past expiration (59 seconds)
+      vi.advanceTimersByTime(59000);
+      room.updateLoot();
+
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+
+      vi.useRealTimers();
+    });
+
+    it('should get loot drop by id', () => {
+      const loot = room.spawnLoot({ x: 100, y: 0, z: 100 }, 25);
+      const retrieved = room.getLootDrop(loot.id);
+
+      expect(retrieved).toBeDefined();
+      expect(retrieved?.id).toBe(loot.id);
+      expect(retrieved?.spice).toBe(25);
+    });
+
+    it('should return undefined for invalid loot id', () => {
+      const retrieved = room.getLootDrop('invalid-id');
+      expect(retrieved).toBeUndefined();
+    });
+
+    it('should handle multiple loot drops', () => {
+      room.spawnLoot({ x: 100, y: 0, z: 100 }, 10);
+      room.spawnLoot({ x: 200, y: 0, z: 200 }, 20);
+      room.spawnLoot({ x: 300, y: 0, z: 300 }, 30);
+
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(3);
+
+      const totalSpice = lootDrops.reduce((sum, loot) => sum + loot.spice, 0);
+      expect(totalSpice).toBe(60);
+    });
   });
 });

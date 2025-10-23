@@ -44,3 +44,10 @@ export interface ThumperState {
   expiresAt: number;
   health: number; // VS4: Thumper health for jamming system
 }
+
+export interface LootDrop {
+  id: string;
+  position: Vector3;
+  spice: number;
+  expiresAt: number;
+}

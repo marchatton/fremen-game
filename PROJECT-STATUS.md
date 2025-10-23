@@ -6,8 +6,8 @@
 
 ## Quick Stats
 
-- **Total Commits**: 30+
-- **Test Coverage**: 727 tests (100% passing) ✅
+- **Total Commits**: 32+
+- **Test Coverage**: 750 tests (100% passing) ✅
 - **Build Status**: All packages compile ✅
 - **Playable**: Yes - complete resource loop with survival mechanics ✅
 
@@ -75,16 +75,18 @@
 
 **Duration**: ~1 day actual
 
-### 🔨 VS4: PvE Combat (In Progress - 5/11)
+### 🔨 VS4: PvE Combat (In Progress - 7/11)
 
-**Completed (5/11)**:
+**Completed (7/11)**:
 1. ✅ HarkonnenAI - AI state machine with vision, patrol, combat, investigate, retreat states (47 tests)
 2. ✅ CombatSystem - Shooting mechanics, hit detection, damage calculation (53 tests)
 3. ✅ Player Shooting - Server-side shooting handler, damage to Harkonnen (16 integration tests)
 4. ✅ Outpost System - Procedural outpost placement, trooper spawning, patrol paths (40 tests)
 5. ✅ Alert System - Harkonnen coordination via alerts when detecting players (30 unit + 11 integration tests)
+6. ✅ Thumper Jamming - Harkonnen can detect and attack thumpers to disable them
+7. ✅ Loot Drops - Spice drops (10-30) spawn on trooper death, proximity-based auto-collection (5m radius), 60s expiration (17 integration tests)
 
-**Test Coverage**: 215 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager + 18 OutpostIntegration + 30 AlertSystem + 11 AlertIntegration)
+**Test Coverage**: 238 unit + integration tests (47 HarkonnenAI + 53 CombatSystem + 16 PlayerShooting + 40 OutpostManager + 18 OutpostIntegration + 30 AlertSystem + 11 AlertIntegration + 9 LootCollection + 14 Room)
 
 **Combat Features**:
 - Weapon stats: damage, fire rate, range, accuracy
@@ -113,10 +115,23 @@
 - Troopers transition: PATROL → INVESTIGATE → PATROL or COMBAT
 - Complete end-to-end alert workflow with expiration
 
+**Thumper Jamming Features**:
+- Harkonnen detect active thumpers within 300m vision range
+- Troopers prioritize thumpers over players in PATROL state
+- Troopers shoot thumpers (20 damage, 1 shot/sec, 80m range)
+- Thumpers have 100 health, become inactive at 0 health (5 shots to destroy)
+- Thumpers stop attracting worms when disabled
+
+**Loot Drop Features**:
+- Random spice amount (10-30) spawned at trooper death position
+- Proximity-based auto-collection (5m radius, checks every game tick)
+- 60-second expiration timer for uncollected loot
+- Loot synced to clients in state broadcasts
+- Dead players cannot collect loot
+- Multiple loot drops can coexist simultaneously
+
 **Planned**:
-6. ⏳ Patrol Routes - Enhanced AI patrol behavior
-7. ⏳ Thumper Jamming - Harkonnen can disable thumpers
-8. ⏳ Loot Drops - Spice/equipment from killed Harkonnen
+8. ⏳ Patrol Routes - Enhanced AI patrol behavior
 9. ⏳ Difficulty Scaling - More Harkonnen over time
 10. ⏳ Combat Integration Tests - Complete combat scenarios
 11. ⏳ Documentation
@@ -228,7 +243,7 @@ pnpm run build
 - ✅ Core worm riding loop playable
 - ✅ Complete resource loop implemented
 - ✅ 60fps performance
-- ✅ 727 tests passing (100%)
+- ✅ 750 tests passing (100%)
 - ✅ Smooth movement
 - ✅ All VS3 systems integrated
 - ✅ VS4 HarkonnenAI complete (47 tests)
@@ -236,7 +251,9 @@ pnpm run build
 - ✅ VS4 Player Shooting complete (16 tests)
 - ✅ VS4 Outpost System complete (40 unit + 18 integration tests)
 - ✅ VS4 Alert System complete (30 unit + 11 integration tests)
-- ✅ Bi-directional combat (Harkonnen ↔ Player)
+- ✅ VS4 Thumper Jamming complete
+- ✅ VS4 Loot Drops complete (17 integration tests)
+- ✅ Bi-directional combat (Harkonnen ↔ Player ↔ Thumpers)
 
 **To Validate**:
 - ❓ Fun factor (playtester feedback)
@@ -245,4 +262,4 @@ pnpm run build
 
 ---
 
-**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat in progress with 5/11 deliverables complete: HarkonnenAI (47 tests), CombatSystem (53 tests), Player Shooting (16 tests), Outpost System (40 tests), and Alert System (30 unit + 11 integration tests). Harkonnen troopers now spawn at 6 procedurally placed outposts with octagonal patrol paths and coordinate via alerts when detecting players. Troopers broadcast alerts (300m radius same outpost, 500m cross-outpost) that trigger nearby troopers to investigate. Ready to continue VS4 with Thumper Jamming or Loot Drops.
+**Conclusion**: VS1, VS2, and VS3 fully complete on the server. VS4 PvE Combat in progress with 7/11 deliverables complete (64%): HarkonnenAI (47 tests), CombatSystem (53 tests), Player Shooting (16 tests), Outpost System (40 unit + 18 integration tests), Alert System (30 unit + 11 integration tests), Thumper Jamming, and Loot Drops (17 integration tests). Harkonnen troopers spawn at 6 procedurally placed outposts with octagonal patrol paths, coordinate via alerts when detecting players, can disable thumpers by shooting them, and drop 10-30 spice when killed which players auto-collect within 5m radius. 750 tests passing (100%). Ready to continue VS4 with remaining deliverables.

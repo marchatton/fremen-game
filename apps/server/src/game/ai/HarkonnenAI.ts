@@ -466,10 +466,13 @@ export class HarkonnenAI {
 
   /**
    * Apply damage to trooper
+   * Returns { killed: boolean, position?: Vector3 } - position is where loot should spawn
    */
-  applyDamage(trooperId: string, damage: number): boolean {
+  applyDamage(trooperId: string, damage: number): { killed: boolean; position?: Vector3 } {
     const trooper = this.troopers.get(trooperId);
-    if (!trooper || trooper.state === HarkonnenState.DEAD) return false;
+    if (!trooper || trooper.state === HarkonnenState.DEAD) {
+      return { killed: false };
+    }
 
     trooper.health = Math.max(0, trooper.health - damage);
 
@@ -477,10 +480,10 @@ export class HarkonnenAI {
       trooper.state = HarkonnenState.DEAD;
       trooper.alertedAt = Date.now();
       console.log(`Trooper ${trooperId} killed`);
-      return true; // Trooper died
+      return { killed: true, position: { ...trooper.position } }; // Return position for loot spawn
     }
 
-    return false;
+    return { killed: false };
   }
 
   /**

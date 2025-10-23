@@ -273,4 +273,94 @@ describe('VS4: Player Shooting Integration', () => {
       expect(player.lastFireTime).toBeGreaterThan(initialFireTime);
     });
   });
+
+  describe('Loot Drops', () => {
+    it('should spawn loot when Harkonnen is killed', () => {
+      const harkonnenAI = (gameLoop as any).harkonnenAI;
+      harkonnenAI.spawnTrooper('harkonnen-1', { x: 30, y: 0, z: 0 }, []);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      // Reduce trooper to 25 health
+      const trooper = harkonnenAI.getTrooper('harkonnen-1')!;
+      trooper.health = 25;
+
+      // Check no loot exists before kill
+      let lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(0);
+
+      // Kill the trooper
+      const result = gameLoop.handlePlayerShoot('player-1', { x: 30, y: 0, z: 0 });
+      expect(result.success).toBe(true);
+      expect(result.hit).toBe(true);
+
+      // Verify loot was spawned
+      lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+      expect(lootDrops[0].position.x).toBe(30);
+      expect(lootDrops[0].position.y).toBe(0);
+      expect(lootDrops[0].position.z).toBe(0);
+      expect(lootDrops[0].spice).toBeGreaterThanOrEqual(10);
+      expect(lootDrops[0].spice).toBeLessThanOrEqual(30);
+    });
+
+    it('should not spawn loot when Harkonnen is hit but not killed', () => {
+      const harkonnenAI = (gameLoop as any).harkonnenAI;
+      harkonnenAI.spawnTrooper('harkonnen-1', { x: 30, y: 0, z: 0 }, []);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      // Hit but not kill
+      gameLoop.handlePlayerShoot('player-1', { x: 30, y: 0, z: 0 });
+
+      // Verify no loot was spawned
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(0);
+    });
+
+    it('should spawn multiple loot drops when killing multiple troopers', () => {
+      const harkonnenAI = (gameLoop as any).harkonnenAI;
+      harkonnenAI.spawnTrooper('harkonnen-1', { x: 30, y: 0, z: 0 }, []);
+      harkonnenAI.spawnTrooper('harkonnen-2', { x: 60, y: 0, z: 0 }, []);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      // Set both troopers to low health
+      harkonnenAI.getTrooper('harkonnen-1')!.health = 25;
+      harkonnenAI.getTrooper('harkonnen-2')!.health = 25;
+
+      // Kill first trooper
+      vi.advanceTimersByTime(500);
+      gameLoop.handlePlayerShoot('player-1', { x: 30, y: 0, z: 0 });
+
+      // Kill second trooper
+      vi.advanceTimersByTime(500);
+      gameLoop.handlePlayerShoot('player-1', { x: 60, y: 0, z: 0 });
+
+      // Verify two loot drops were spawned
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(2);
+    });
+
+    it('should spawn loot at trooper death position', () => {
+      const harkonnenAI = (gameLoop as any).harkonnenAI;
+      const deathPosition = { x: 42, y: 0, z: 73 };
+      harkonnenAI.spawnTrooper('harkonnen-1', deathPosition, []);
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      // Set trooper to low health
+      const trooper = harkonnenAI.getTrooper('harkonnen-1')!;
+      trooper.health = 25;
+
+      // Kill the trooper
+      player.state.position = deathPosition; // Move player close to trooper
+      gameLoop.handlePlayerShoot('player-1', deathPosition);
+
+      // Verify loot spawned at correct position
+      const lootDrops = room.getLootDrops();
+      expect(lootDrops).toHaveLength(1);
+      expect(lootDrops[0].position).toEqual(deathPosition);
+    });
+  });
 });

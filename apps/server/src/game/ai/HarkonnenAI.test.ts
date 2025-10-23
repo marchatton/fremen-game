@@ -464,9 +464,10 @@ describe('VS4: Harkonnen AI System', () => {
     it('should transition to DEAD when health reaches 0', () => {
       const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
 
-      const died = ai.applyDamage('trooper-1', 100);
+      const result = ai.applyDamage('trooper-1', 100);
 
-      expect(died).toBe(true);
+      expect(result.killed).toBe(true);
+      expect(result.position).toEqual(trooper.position);
       expect(trooper.state).toBe(HarkonnenState.DEAD);
       expect(trooper.alertedAt).toBeDefined();
     });
@@ -478,22 +479,25 @@ describe('VS4: Harkonnen AI System', () => {
 
       const result = ai.applyDamage('trooper-1', 25);
 
-      expect(result).toBe(false);
+      expect(result.killed).toBe(false);
+      expect(result.position).toBeUndefined();
       expect(trooper.health).toBe(0);
     });
 
     it('should return false if damage does not kill', () => {
       ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
 
-      const died = ai.applyDamage('trooper-1', 50);
+      const result = ai.applyDamage('trooper-1', 50);
 
-      expect(died).toBe(false);
+      expect(result.killed).toBe(false);
+      expect(result.position).toBeUndefined();
     });
 
     it('should handle damage to non-existent trooper', () => {
       const result = ai.applyDamage('nonexistent', 50);
 
-      expect(result).toBe(false);
+      expect(result.killed).toBe(false);
+      expect(result.position).toBeUndefined();
     });
   });
 
