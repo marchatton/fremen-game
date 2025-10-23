@@ -11,8 +11,8 @@ import { EquipmentManager } from './EquipmentManager';
 import { SietchManager } from './SietchManager';
 import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
-import { CombatSystem } from './CombatSystem';
-import { HarkonnenAI } from './ai/HarkonnenAI';
+import { CombatSystem, WeaponType } from './CombatSystem';
+import { HarkonnenAI, HarkonnenState } from './ai/HarkonnenAI';
 
 export class GameLoop {
   private room: Room;
@@ -339,6 +339,84 @@ export class GameLoop {
   handleWormControl(wormId: string, direction: number, speedIntent: number) {
     const deltaTime = 1 / GAME_CONSTANTS.TICK_RATE;
     this.wormAI.steerWorm(wormId, direction, speedIntent, deltaTime);
+  }
+
+  /**
+   * VS4: Handle player shooting at Harkonnen
+   */
+  handlePlayerShoot(playerId: string, targetPosition: { x: number; y: number; z: number }): { success: boolean; hit: boolean; damage?: number; targetId?: string; reason?: string } {
+    const player = this.room.getPlayer(playerId);
+    if (!player) {
+      return { success: false, hit: false, reason: 'Player not found' };
+    }
+
+    if (player.state.state === PlayerStateEnum.DEAD) {
+      return { success: false, hit: false, reason: 'Player is dead' };
+    }
+
+    const now = Date.now();
+
+    // Check fire rate cooldown
+    const canFire = this.combatSystem.canFire(
+      WeaponType.PLAYER_RIFLE,
+      player.lastFireTime,
+      now
+    );
+
+    if (!canFire) {
+      return { success: false, hit: false, reason: 'Fire rate cooldown' };
+    }
+
+    // Find nearest Harkonnen in line of fire
+    const troopers = this.harkonnenAI.getTroopers();
+    let nearestTrooper: { id: string; position: { x: number; y: number; z: number }; distance: number } | null = null;
+    let minDistance = Infinity;
+
+    for (const trooper of troopers) {
+      if (trooper.state === HarkonnenState.DEAD) continue;
+
+      const distance = Math.sqrt(
+        (trooper.position.x - targetPosition.x) ** 2 +
+        (trooper.position.y - targetPosition.y) ** 2 +
+        (trooper.position.z - targetPosition.z) ** 2
+      );
+
+      if (distance < 5 && distance < minDistance) { // Within 5m of target point
+        minDistance = distance;
+        nearestTrooper = { id: trooper.id, position: trooper.position, distance };
+      }
+    }
+
+    if (!nearestTrooper) {
+      player.lastFireTime = now;
+      return { success: true, hit: false, reason: 'No target in range' };
+    }
+
+    // Shoot at nearest trooper
+    const shootResult = this.combatSystem.playerShoot(
+      player.state.position,
+      nearestTrooper.position,
+      nearestTrooper.id,
+      true // TODO: proper line of sight check
+    );
+
+    player.lastFireTime = now;
+
+    if (shootResult.hit && shootResult.targetId) {
+      // Apply damage to Harkonnen
+      const killed = this.harkonnenAI.applyDamage(shootResult.targetId, shootResult.damage);
+
+      console.log(`Player ${playerId} ${killed ? 'killed' : 'hit'} Harkonnen ${shootResult.targetId} for ${shootResult.damage} damage`);
+
+      return {
+        success: true,
+        hit: true,
+        damage: shootResult.damage,
+        targetId: shootResult.targetId,
+      };
+    }
+
+    return { success: true, hit: false, reason: 'Shot missed' };
   }
 
   /**

@@ -13,6 +13,7 @@ export interface RoomPlayer {
   lastInputSeq: number;
   connectedAt: number;
   thumperCount: number;
+  lastFireTime: number; // VS4: Track shooting cooldown
 }
 
 export class Room {
@@ -57,6 +58,7 @@ export class Room {
       lastInputSeq: 0,
       connectedAt: Date.now(),
       thumperCount: 3,
+      lastFireTime: 0,
     });
 
     this.disconnectedPlayers.delete(playerId);
