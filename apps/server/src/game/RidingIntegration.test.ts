@@ -58,7 +58,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       // Steer toward objective for several ticks
       for (let i = 0; i < 30; i++) {
-        gameLoop.handleWormControl('worm-0', 1.0, 1.0, 1 / GAME_CONSTANTS.TICK_RATE);
+        gameLoop.handleWormControl('worm-0', 1.0, 1.0);
         (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
       }
 
@@ -255,7 +255,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       // Update game state multiple times
       for (let i = 0; i < 10; i++) {
-        gameLoop.handleWormControl('worm-0', 1.0, 1.0, 1 / GAME_CONSTANTS.TICK_RATE);
+        gameLoop.handleWormControl('worm-0', 1.0, 1.0);
         (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
 
         const worms = (gameLoop as any).wormAI.getWorms();
@@ -332,7 +332,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       // Steer toward objective
       for (let i = 0; i < 100; i++) {
-        gameLoop.handleWormControl('worm-0', 0.5, 1.0, 1 / GAME_CONSTANTS.TICK_RATE);
+        gameLoop.handleWormControl('worm-0', 0.5, 1.0);
         (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
 
         if (objective.status === ObjectiveStatus.COMPLETED) {
@@ -411,7 +411,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       expect(() => {
         for (let i = 0; i < 100; i++) {
-          gameLoop.handleWormControl('worm-0', Math.random() * 2 - 1, Math.random() * 2 - 1, 1 / GAME_CONSTANTS.TICK_RATE);
+          gameLoop.handleWormControl('worm-0', Math.random() * 2 - 1, Math.random() * 2 - 1);
           (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
         }
       }).not.toThrow();
@@ -425,7 +425,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       gameLoop.handleMountAttempt('player1', 'worm-0');
 
       for (let i = 0; i < 300; i++) {
-        gameLoop.handleWormControl('worm-0', 1.0, 1.0, 1 / GAME_CONSTANTS.TICK_RATE);
+        gameLoop.handleWormControl('worm-0', 1.0, 1.0);
         (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
 
         const worms = (gameLoop as any).wormAI.getWorms();
@@ -469,7 +469,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       expect(() => {
         for (const dt of deltaTimes) {
-          gameLoop.handleWormControl('worm-0', 1.0, 1.0, dt);
+          gameLoop.handleWormControl('worm-0', 1.0, 1.0);
           (gameLoop as any).updateGameState(dt);
         }
       }).not.toThrow();

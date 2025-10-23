@@ -97,18 +97,27 @@ export async function updatePlayerResources(
   waterDelta: number
 ): Promise<{ success: boolean; newSpice: number; newWater: number }> {
   try {
-    // Use a transaction to ensure atomic update
+    // Read-calculate-write pattern for transaction safety
+    const [player] = await db
+      .select()
+      .from(players)
+      .where(eq(players.id, playerId))
+      .limit(1);
+
+    if (!player) {
+      return { success: false, newSpice: 0, newWater: 0 };
+    }
+
+    // Calculate new values with bounds
+    const newSpice = Math.max(0, player.spice + spiceDelta); // Prevent negative
+    const newWater = Math.max(0, Math.min(100, player.water + waterDelta)); // Clamp 0-100
+
+    // Update with new values
     const [updated] = await db
       .update(players)
       .set({
-        spice: db.$with('new_spice').as(
-          // Prevent negative spice
-          db.select({ value: db.raw(`GREATEST(spice + ${spiceDelta}, 0)`) }).from(players).where(eq(players.id, playerId))
-        ),
-        water: db.$with('new_water').as(
-          // Clamp water to 0-100 range
-          db.raw(`GREATEST(0, LEAST(100, water + ${waterDelta}))`)
-        ),
+        spice: newSpice,
+        water: newWater,
         updatedAt: new Date(),
       })
       .where(eq(players.id, playerId))

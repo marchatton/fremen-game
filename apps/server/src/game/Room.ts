@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io';
-import type { PlayerState, ThumperState } from '@fremen/shared';
-import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
+import type { PlayerState, ThumperState, PlayerResources } from '@fremen/shared';
+import { GAME_CONSTANTS, PlayerStateEnum, STARTING_RESOURCES } from '@fremen/shared';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface RoomPlayer {
@@ -8,6 +8,8 @@ export interface RoomPlayer {
   playerId: string;
   username: string;
   state: PlayerState;
+  resources: PlayerResources;
+  health: number;
   lastInputSeq: number;
   connectedAt: number;
   thumperCount: number;
@@ -44,6 +46,14 @@ export class Room {
       playerId,
       username,
       state: initialState,
+      resources: {
+        water: STARTING_RESOURCES.water!,
+        spice: STARTING_RESOURCES.spice!,
+        equipment: STARTING_RESOURCES.equipment!,
+        stats: { ...STARTING_RESOURCES.stats! },
+        inventory: STARTING_RESOURCES.inventory ? [...STARTING_RESOURCES.inventory] : [],
+      },
+      health: 100,
       lastInputSeq: 0,
       connectedAt: Date.now(),
       thumperCount: 3,

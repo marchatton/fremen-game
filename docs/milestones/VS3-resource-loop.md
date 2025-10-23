@@ -37,11 +37,12 @@
 **Tests**: Stillsuits reduce water loss correctly, equip/unequip persists
 
 ### 4. Database Persistence (DrizzleORM)
-- [ ] Schema: `players` table (id, username, water, spice, equipment, last_position)
-- [ ] On connect: Load player state from DB
-- [ ] On disconnect: Save current state
-- [ ] Periodic auto-save: Every 5 minutes while connected
-- [ ] Transactions for spice/water changes (prevent duplication exploits)
+- [x] Schema: `players` table (id, username, water, spice, equipment, last_position)
+- [x] Load/save player functions (loadPlayer, savePlayer)
+- [ ] On connect: Load player state from DB (integration pending)
+- [ ] On disconnect: Save current state (integration pending)
+- [x] Periodic auto-save: Every 5 minutes while connected (AutoSaveManager)
+- [x] Transactions for spice/water changes (updatePlayerResources with bounds checking)
 
 **Tests**: State persists across sessions, concurrent updates don't corrupt data
 

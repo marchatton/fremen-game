@@ -1,9 +1,16 @@
-import { GAME_CONSTANTS, PlayerStateEnum } from '@fremen/shared';
+import { GAME_CONSTANTS, PlayerStateEnum, ECONOMY_CONSTANTS } from '@fremen/shared';
 import type { Room } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
 import { WormDamage } from './sim/WormDamage';
 import { ObjectiveManager } from './ObjectiveManager';
+import { SpiceManager } from './SpiceManager';
+import { WaterSystem } from './WaterSystem';
+import { OasisManager } from './OasisManager';
+import { EquipmentManager } from './EquipmentManager';
+import { SietchManager } from './SietchManager';
+import { RewardManager } from './RewardManager';
+import { DeathManager } from './DeathManager';
 
 export class GameLoop {
   private room: Room;
@@ -11,6 +18,16 @@ export class GameLoop {
   private wormAI: WormAI;
   private wormDamage: WormDamage;
   private objectiveManager: ObjectiveManager;
+
+  // VS3 Systems
+  private spiceManager: SpiceManager;
+  private waterSystem: WaterSystem;
+  private oasisManager: OasisManager;
+  private equipmentManager: EquipmentManager;
+  private sietchManager: SietchManager;
+  private rewardManager: RewardManager;
+  private deathManager: DeathManager;
+
   private tickCount = 0;
   private lastTickTime = Date.now();
   private intervalId?: NodeJS.Timeout;
@@ -22,6 +39,21 @@ export class GameLoop {
     this.wormDamage = new WormDamage(seed);
     this.objectiveManager = new ObjectiveManager();
     this.objectiveManager.spawnRandomObjective();
+
+    // Initialize VS3 systems
+    this.spiceManager = new SpiceManager(seed);
+    this.waterSystem = new WaterSystem();
+    this.oasisManager = new OasisManager();
+    this.equipmentManager = new EquipmentManager();
+    this.sietchManager = new SietchManager();
+    this.rewardManager = new RewardManager();
+    this.deathManager = new DeathManager();
+
+    // Generate world content
+    this.spiceManager.generateNodes();
+    this.oasisManager.generateOases();
+
+    console.log('VS3 systems initialized');
   }
 
   start() {
@@ -60,8 +92,17 @@ export class GameLoop {
     const players = this.room.getAllPlayers();
 
     this.wormAI.update(deltaTime);
-    
+
+    // Track previous positions for distance calculation
+    const previousPositions = new Map<string, {x: number, z: number}>();
+
     for (const player of players) {
+      // Store previous position
+      previousPositions.set(player.playerId, {
+        x: player.state.position.x,
+        z: player.state.position.z,
+      });
+
       if (player.state.state === PlayerStateEnum.RIDING && player.state.ridingWormId) {
         const worm = this.wormAI.getWorm(player.state.ridingWormId);
         if (worm && worm.controlPoints.length >= 3) {
@@ -81,8 +122,49 @@ export class GameLoop {
           deltaTime
         );
       }
+
+      // VS3: Water depletion
+      if (player.state.state !== PlayerStateEnum.DEAD) {
+        const waterReduction = this.equipmentManager.calculateWaterReduction(player.resources.equipment);
+        player.resources.water = this.waterSystem.calculateWaterDepletion(
+          player.resources.water,
+          player.state,
+          deltaTime,
+          waterReduction
+        );
+
+        // Apply thirst effects
+        const effect = this.waterSystem.getThirstEffects(player.resources.water);
+
+        // Apply health drain
+        if (effect.healthDrain > 0) {
+          player.health -= effect.healthDrain * deltaTime;
+          player.health = Math.max(0, player.health);
+        }
+
+        // Check for death
+        if (this.deathManager.checkDeath(player.resources.water) || player.health <= 0) {
+          this.handlePlayerDeath(player.playerId);
+        }
+      }
+
+      // VS3: Track distance traveled
+      const prevPos = previousPositions.get(player.playerId);
+      if (prevPos && player.state.state !== PlayerStateEnum.DEAD) {
+        const distance = Math.sqrt(
+          Math.pow(player.state.position.x - prevPos.x, 2) +
+          Math.pow(player.state.position.z - prevPos.z, 2)
+        );
+        player.resources.stats = this.rewardManager.addDistanceTraveled(
+          player.resources.stats,
+          distance
+        );
+      }
     }
-    
+
+    // VS3: Update spice harvesting
+    this.spiceManager.update(deltaTime);
+
     this.room.updateThumpers();
     
     const activeThumpers = this.room.getActiveThumpers();
@@ -98,13 +180,18 @@ export class GameLoop {
     const worms = this.wormAI.getWorms();
     for (const worm of worms) {
       if (worm.aiState === 'RIDDEN_BY' && worm.controlPoints.length > 0) {
-        this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
+        const completed = this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
+
+        // VS3: Grant reward to rider on objective completion
+        if (completed && worm.riderId) {
+          this.grantObjectiveReward(worm.riderId);
+        }
       }
 
       const damage = this.wormDamage.checkTerrainDamage(worm);
       if (damage > 0) {
         const died = this.wormDamage.applyDamage(worm, damage);
-        
+
         if (died && worm.riderId) {
           this.handleDismount(worm.riderId);
           console.log(`Worm ${worm.id} died, ejecting rider`);
@@ -175,6 +262,9 @@ export class GameLoop {
     player.state.ridingWormId = wormId;
     player.state.velocity = { x: 0, y: 0, z: 0 };
 
+    // VS3: Track worms ridden stat
+    player.resources.stats = this.rewardManager.incrementWormsRidden(player.resources.stats);
+
     return { success: true };
   }
 
@@ -208,5 +298,56 @@ export class GameLoop {
   handleWormControl(wormId: string, direction: number, speedIntent: number) {
     const deltaTime = 1 / GAME_CONSTANTS.TICK_RATE;
     this.wormAI.steerWorm(wormId, direction, speedIntent, deltaTime);
+  }
+
+  /**
+   * VS3: Handle player death
+   */
+  private handlePlayerDeath(playerId: string): void {
+    const player = this.room.getPlayer(playerId);
+    if (!player) return;
+
+    // Process death
+    const deathResult = this.deathManager.processDeath(
+      playerId,
+      player.state.position,
+      player.resources.spice,
+      player.resources.stats
+    );
+
+    // Update player state
+    player.state.state = PlayerStateEnum.DEAD;
+    player.state.position = { ...deathResult.respawnPosition };
+    player.resources.water = deathResult.respawnWater;
+    player.resources.spice = deathResult.spiceRemaining;
+    player.resources.stats = deathResult.newStats;
+    player.health = deathResult.respawnHealth;
+
+    // Reset to active state (respawn)
+    player.state.state = PlayerStateEnum.ACTIVE;
+
+    console.log(`Player ${playerId} died and respawned at Sietch`);
+  }
+
+  /**
+   * VS3: Grant objective reward
+   */
+  private grantObjectiveReward(playerId: string): void {
+    const player = this.room.getPlayer(playerId);
+    if (!player) return;
+
+    const rewardResult = this.rewardManager.grantObjectiveReward(
+      player.resources.spice,
+      player.resources.water
+    );
+
+    player.resources.spice = rewardResult.spice;
+    player.resources.water = rewardResult.water;
+    player.resources.stats = this.rewardManager.updateObjectiveStats(
+      player.resources.stats,
+      ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE
+    );
+
+    console.log(`Player ${playerId} completed objective: +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE} spice, +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_WATER} water`);
   }
 }
