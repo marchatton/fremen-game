@@ -72,6 +72,7 @@ integration.test.ts  # server integration tests
 - Wrap resource persistence in transactions; Drizzle helpers live in `apps/server/src/db`.
 - When adding protocol messages or entities, follow the documented steps (update shared types, server logic, client visuals, tests, docs).
 - Audit interest-management and broadcast frequency changes against `docs/02-network-protocol.md` and capture deltas in the protocol docs whenever thresholds shift.
+- Keep resilience/edge-case handling aligned with `docs/04-edge-cases-resilience.md`; update that doc when disconnect/bot/backfill behaviour changes.
 
 ---
 
@@ -86,6 +87,7 @@ integration.test.ts  # server integration tests
 - Reuse `TerrainGenerator` + constants from `@fremen/shared`; avoid duplicating math in client/server.
 - Document any protocol/schema changes in `docs/02-network-protocol.md` and regenerate diagrams if needed.
 - Note manual playtest expectations by updating `TESTING.md` whenever sandbox steps change (e.g. new HUD flow or riding controls).
+- Update `docs/04-edge-cases-resilience.md` when altering disconnect handling, bot policies, or anti-cheat flows.
 
 **Don’t**
 

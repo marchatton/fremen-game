@@ -78,6 +78,7 @@ auth/           # JWT helpers
 * When persistence is involved, use `db/persistence.ts` helpers (transactions, autosave manager) and update `.env.example`.
 * Protocol or gameplay changes must be mirrored in docs (`docs/02-network-protocol.md`, milestone summaries).
 * Reflect interest-management or tick-rate adjustments in the protocol docs so other agents stay aligned with bandwidth/CPU targets.
+* Synchronize resilience/edge-case logic with `docs/04-edge-cases-resilience.md`; edit that doc when disconnect, bot, or anti-cheat rules shift.
 
 ---
 
@@ -91,6 +92,7 @@ auth/           # JWT helpers
 * Keep shared constants single-sourced in `packages/shared/src/constants`.
 * Run manual sandbox checks per `TESTING.md` when touching client render/input loops.
 * Amend `TESTING.md` when procedural changes alter the sandbox walkthrough (new objectives, UI prompts, etc.).
+* Update `docs/04-edge-cases-resilience.md` alongside changes to reconnect flows, bot backfill, or exploit mitigation.
 
 **Don't**
 
