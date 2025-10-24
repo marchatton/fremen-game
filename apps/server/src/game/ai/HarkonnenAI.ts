@@ -1,4 +1,6 @@
 import type { Vector3 } from '@fremen/shared';
+import { CombatSystem, WeaponType, type ShootResult } from '../CombatSystem';
+import type { AlertSystem } from '../AlertSystem';
 
 export enum HarkonnenState {
   PATROL = 'PATROL',
@@ -18,6 +20,7 @@ export interface HarkonnenTrooper {
   currentWaypoint: number;
   patrolPath: Vector3[];
   targetPlayerId?: string;
+  targetThumperId?: string; // VS4: Thumper jamming target
   lastKnownPlayerPosition?: Vector3;
   investigateUntil?: number;
   retreatTarget?: Vector3;
@@ -45,6 +48,9 @@ interface DetectionResult {
  */
 export class HarkonnenAI {
   private troopers: Map<string, HarkonnenTrooper> = new Map();
+  private combatSystem: CombatSystem;
+  private shotsFired: ShootResult[] = [];
+  private alertSystem?: AlertSystem;
 
   // AI Configuration
   private readonly VISION_RANGE = 50; // meters
@@ -58,6 +64,17 @@ export class HarkonnenAI {
   private readonly PATROL_SPEED = 3; // m/s
   private readonly COMBAT_SPEED = 5; // m/s
   private readonly CORPSE_DURATION = 30000; // 30 seconds
+
+  constructor() {
+    this.combatSystem = new CombatSystem();
+  }
+
+  /**
+   * Set alert system for coordination
+   */
+  setAlertSystem(alertSystem: AlertSystem): void {
+    this.alertSystem = alertSystem;
+  }
 
   /**
    * Spawn a new Harkonnen trooper
@@ -90,8 +107,15 @@ export class HarkonnenAI {
   /**
    * Update all troopers
    */
-  update(deltaTime: number, players: Array<{ id: string; position: Vector3; state: string }>): void {
+  update(
+    deltaTime: number,
+    players: Array<{ id: string; position: Vector3; state: string }>,
+    thumpers?: Array<{ id: string; position: Vector3; active: boolean }>
+  ): void {
     const now = Date.now();
+
+    // Clear shots from previous update
+    this.shotsFired = [];
 
     for (const trooper of this.troopers.values()) {
       if (trooper.state === HarkonnenState.DEAD) {
@@ -103,7 +127,7 @@ export class HarkonnenAI {
       }
 
       // Update AI state machine
-      this.updateStateMachine(trooper, players, deltaTime, now);
+      this.updateStateMachine(trooper, players, thumpers || [], deltaTime, now);
     }
   }
 
@@ -113,18 +137,19 @@ export class HarkonnenAI {
   private updateStateMachine(
     trooper: HarkonnenTrooper,
     players: Array<{ id: string; position: Vector3; state: string }>,
+    thumpers: Array<{ id: string; position: Vector3; active: boolean }>,
     deltaTime: number,
     now: number
   ): void {
     switch (trooper.state) {
       case HarkonnenState.PATROL:
-        this.updatePatrol(trooper, players, deltaTime, now);
+        this.updatePatrol(trooper, players, thumpers, deltaTime, now);
         break;
       case HarkonnenState.INVESTIGATE:
         this.updateInvestigate(trooper, players, deltaTime, now);
         break;
       case HarkonnenState.COMBAT:
-        this.updateCombat(trooper, players, deltaTime, now);
+        this.updateCombat(trooper, players, thumpers, deltaTime, now);
         break;
       case HarkonnenState.RETREAT:
         this.updateRetreat(trooper, players, deltaTime, now);
@@ -138,9 +163,29 @@ export class HarkonnenAI {
   private updatePatrol(
     trooper: HarkonnenTrooper,
     players: Array<{ id: string; position: Vector3; state: string }>,
+    thumpers: Array<{ id: string; position: Vector3; active: boolean }>,
     deltaTime: number,
     now: number
   ): void {
+    // Check for alerts from other troopers
+    if (this.alertSystem) {
+      const alerts = this.alertSystem.getAlertsForTrooper(
+        trooper.id,
+        trooper.position,
+        trooper.outpostId
+      );
+
+      if (alerts.length > 0) {
+        // Respond to nearest alert
+        const nearestAlert = alerts[0];
+        trooper.state = HarkonnenState.INVESTIGATE;
+        trooper.lastKnownPlayerPosition = nearestAlert.position;
+        trooper.investigateUntil = now + this.INVESTIGATE_DURATION;
+        console.log(`Trooper ${trooper.id} responding to alert from ${nearestAlert.alertingTrooperId}, INVESTIGATING`);
+        return;
+      }
+    }
+
     // Check for player detection
     const detection = this.detectPlayers(trooper, players);
     if (detection.detected) {
@@ -148,7 +193,28 @@ export class HarkonnenAI {
       trooper.targetPlayerId = detection.playerId;
       trooper.lastKnownPlayerPosition = detection.position;
       trooper.alertedAt = now;
+
+      // Broadcast alert to nearby troopers
+      if (this.alertSystem && detection.playerId && detection.position) {
+        this.alertSystem.broadcastAlert(
+          trooper.id,
+          detection.playerId,
+          detection.position,
+          trooper.outpostId
+        );
+      }
+
       console.log(`Trooper ${trooper.id} detected player ${detection.playerId}, entering COMBAT`);
+      return;
+    }
+
+    // VS4: Check for active thumpers (lower priority than players)
+    const thumperDetection = this.detectThumpers(trooper, thumpers);
+    if (thumperDetection.detected && thumperDetection.thumperId) {
+      trooper.state = HarkonnenState.COMBAT;
+      trooper.targetThumperId = thumperDetection.thumperId;
+      trooper.lastKnownPlayerPosition = thumperDetection.position;
+      console.log(`Trooper ${trooper.id} detected thumper ${thumperDetection.thumperId}, engaging`);
       return;
     }
 
@@ -191,6 +257,17 @@ export class HarkonnenAI {
       trooper.state = HarkonnenState.COMBAT;
       trooper.targetPlayerId = detection.playerId;
       trooper.lastKnownPlayerPosition = detection.position;
+
+      // Broadcast alert to nearby troopers
+      if (this.alertSystem && detection.playerId && detection.position) {
+        this.alertSystem.broadcastAlert(
+          trooper.id,
+          detection.playerId,
+          detection.position,
+          trooper.outpostId
+        );
+      }
+
       console.log(`Trooper ${trooper.id} re-acquired target, entering COMBAT`);
       return;
     }
@@ -210,11 +287,12 @@ export class HarkonnenAI {
   }
 
   /**
-   * COMBAT state: Engage player, maintain distance
+   * COMBAT state: Engage player or thumper, maintain distance
    */
   private updateCombat(
     trooper: HarkonnenTrooper,
     players: Array<{ id: string; position: Vector3; state: string }>,
+    thumpers: Array<{ id: string; position: Vector3; active: boolean }>,
     deltaTime: number,
     now: number
   ): void {
@@ -226,7 +304,36 @@ export class HarkonnenAI {
       return;
     }
 
-    // Find target player
+    // VS4: Handle thumper target
+    if (trooper.targetThumperId) {
+      const thumper = thumpers.find(t => t.id === trooper.targetThumperId && t.active);
+      if (!thumper) {
+        // Thumper destroyed or inactive, return to patrol
+        trooper.state = HarkonnenState.PATROL;
+        trooper.targetThumperId = undefined;
+        trooper.lastKnownPlayerPosition = undefined;
+        console.log(`Trooper ${trooper.id} thumper destroyed, returning to PATROL`);
+        return;
+      }
+
+      const distance = this.getDistance(trooper.position, thumper.position);
+
+      // Move toward thumper if too far
+      if (distance > this.COMBAT_MAX_DISTANCE) {
+        this.moveTowards(trooper, thumper.position, this.COMBAT_SPEED, deltaTime);
+      }
+
+      // Fire at thumper if in range and fire rate allows
+      if (distance <= this.COMBAT_MAX_DISTANCE && now - trooper.lastFireTime > this.FIRE_RATE) {
+        this.fireAtThumper(trooper, thumper.position, thumper.id, now);
+      }
+
+      // Face thumper
+      this.faceTowards(trooper, thumper.position);
+      return;
+    }
+
+    // Handle player target
     const target = players.find(p => p.id === trooper.targetPlayerId);
     if (!target) {
       // Target lost, investigate
@@ -256,7 +363,7 @@ export class HarkonnenAI {
 
     // Fire at player if LOS and fire rate allows
     if (hasLOS && now - trooper.lastFireTime > this.FIRE_RATE) {
-      this.fireAtPlayer(trooper, target.position, now);
+      this.fireAtPlayer(trooper, target.position, target.id, now);
     }
 
     // Face target
@@ -330,11 +437,42 @@ export class HarkonnenAI {
   }
 
   /**
-   * Apply damage to trooper
+   * VS4: Detect active thumpers within range
    */
-  applyDamage(trooperId: string, damage: number): boolean {
+  private detectThumpers(
+    trooper: HarkonnenTrooper,
+    thumpers: Array<{ id: string; position: Vector3; active: boolean }>
+  ): { detected: boolean; thumperId?: string; position?: Vector3; distance?: number } {
+    const THUMPER_DETECTION_RANGE = 100; // meters
+
+    for (const thumper of thumpers) {
+      if (!thumper.active) continue;
+
+      const distance = this.getDistance(trooper.position, thumper.position);
+
+      if (distance <= THUMPER_DETECTION_RANGE) {
+        // Thumpers are noisy and easily detectable (no vision cone check)
+        return {
+          detected: true,
+          thumperId: thumper.id,
+          position: thumper.position,
+          distance,
+        };
+      }
+    }
+
+    return { detected: false };
+  }
+
+  /**
+   * Apply damage to trooper
+   * Returns { killed: boolean, position?: Vector3 } - position is where loot should spawn
+   */
+  applyDamage(trooperId: string, damage: number): { killed: boolean; position?: Vector3 } {
     const trooper = this.troopers.get(trooperId);
-    if (!trooper || trooper.state === HarkonnenState.DEAD) return false;
+    if (!trooper || trooper.state === HarkonnenState.DEAD) {
+      return { killed: false };
+    }
 
     trooper.health = Math.max(0, trooper.health - damage);
 
@@ -342,19 +480,55 @@ export class HarkonnenAI {
       trooper.state = HarkonnenState.DEAD;
       trooper.alertedAt = Date.now();
       console.log(`Trooper ${trooperId} killed`);
-      return true; // Trooper died
+      return { killed: true, position: { ...trooper.position } }; // Return position for loot spawn
     }
 
-    return false;
+    return { killed: false };
   }
 
   /**
-   * Fire at player (stub for combat system integration)
+   * Fire at player using combat system
    */
-  private fireAtPlayer(trooper: HarkonnenTrooper, targetPos: Vector3, now: number): void {
+  private fireAtPlayer(trooper: HarkonnenTrooper, targetPos: Vector3, targetId: string, now: number): void {
     trooper.lastFireTime = now;
-    // TODO: Integrate with combat system to apply damage
-    console.log(`Trooper ${trooper.id} fired at target`);
+
+    const hasLOS = this.hasLineOfSight(trooper.position, targetPos);
+    const shootResult = this.combatSystem.harkonnenShoot(
+      trooper.position,
+      targetPos,
+      targetId,
+      hasLOS
+    );
+
+    // Store shot result for GameLoop to process
+    if (shootResult.hit) {
+      this.shotsFired.push(shootResult);
+      console.log(`Trooper ${trooper.id} hit ${targetId} for ${shootResult.damage} damage`);
+    } else {
+      console.log(`Trooper ${trooper.id} fired at ${targetId} but missed`);
+    }
+  }
+
+  /**
+   * VS4: Fire at thumper (always hits, no LOS check needed for stationary target)
+   */
+  private fireAtThumper(trooper: HarkonnenTrooper, targetPos: Vector3, thumperId: string, now: number): void {
+    trooper.lastFireTime = now;
+
+    // Thumpers are stationary and easy targets - always hit
+    const damage = 20; // Same damage as player shots
+    const distance = this.getDistance(trooper.position, targetPos);
+
+    // Store result with thumper ID for GameLoop to process
+    this.shotsFired.push({
+      hit: true,
+      targetId: thumperId,
+      targetType: 'thumper',
+      damage,
+      distance,
+    });
+
+    console.log(`Trooper ${trooper.id} hit thumper ${thumperId} for ${damage} damage`);
   }
 
   /**
@@ -469,5 +643,12 @@ export class HarkonnenAI {
     return Array.from(this.troopers.values()).filter(
       t => t.targetPlayerId === playerId && t.state === HarkonnenState.COMBAT
     );
+  }
+
+  /**
+   * Get shots fired this update (for GameLoop to apply damage)
+   */
+  getShotsFired(): ShootResult[] {
+    return [...this.shotsFired];
   }
 }

@@ -11,6 +11,10 @@ import { EquipmentManager } from './EquipmentManager';
 import { SietchManager } from './SietchManager';
 import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
+import { CombatSystem, WeaponType } from './CombatSystem';
+import { HarkonnenAI, HarkonnenState } from './ai/HarkonnenAI';
+import { OutpostManager } from './OutpostManager';
+import { AlertSystem } from './AlertSystem';
 
 export class GameLoop {
   private room: Room;
@@ -27,6 +31,12 @@ export class GameLoop {
   private sietchManager: SietchManager;
   private rewardManager: RewardManager;
   private deathManager: DeathManager;
+
+  // VS4 Systems
+  private combatSystem: CombatSystem;
+  private harkonnenAI: HarkonnenAI;
+  private outpostManager: OutpostManager;
+  private alertSystem: AlertSystem;
 
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -54,6 +64,50 @@ export class GameLoop {
     this.oasisManager.generateOases();
 
     console.log('VS3 systems initialized');
+
+    // Initialize VS4 systems
+    this.combatSystem = new CombatSystem();
+    this.harkonnenAI = new HarkonnenAI();
+    this.outpostManager = new OutpostManager(seed);
+    this.alertSystem = new AlertSystem();
+
+    // Connect alert system to AI
+    this.harkonnenAI.setAlertSystem(this.alertSystem);
+
+    // Generate outposts and spawn Harkonnen
+    const oasisPositions = this.oasisManager.getOases().map(o => o.position);
+    this.outpostManager.generateOutposts(oasisPositions);
+    this.spawnHarkonnenAtOutposts();
+
+    console.log('VS4 systems initialized');
+  }
+
+  /**
+   * VS4: Spawn Harkonnen troopers at all outposts
+   */
+  private spawnHarkonnenAtOutposts(): void {
+    const outposts = this.outpostManager.getOutposts();
+
+    for (const outpost of outposts) {
+      const trooperCount = this.outpostManager.getTrooperCountForOutpost(outpost.id);
+      const patrolPath = this.outpostManager.generatePatrolPath(outpost.id);
+
+      for (let i = 0; i < trooperCount; i++) {
+        const trooperId = `${outpost.id}-trooper-${i}`;
+
+        this.harkonnenAI.spawnTrooper(
+          trooperId,
+          outpost.position,
+          patrolPath.waypoints,
+          outpost.id
+        );
+
+        this.outpostManager.addTrooperToOutpost(outpost.id, trooperId);
+      }
+    }
+
+    const stats = this.outpostManager.getOutpostStats();
+    console.log(`Spawned ${stats.totalTroopers} Harkonnen troopers across ${stats.total} outposts`);
   }
 
   start() {
@@ -160,12 +214,33 @@ export class GameLoop {
           distance
         );
       }
+
+      // VS4: Auto-collect nearby loot drops
+      if (player.state.state !== PlayerStateEnum.DEAD) {
+        const lootDrops = this.room.getLootDrops();
+        for (const loot of lootDrops) {
+          const lootDistance = Math.sqrt(
+            Math.pow(player.state.position.x - loot.position.x, 2) +
+            Math.pow(player.state.position.z - loot.position.z, 2)
+          );
+
+          // Auto-collect within 5m radius
+          if (lootDistance <= 5) {
+            const collected = this.room.collectLoot(loot.id, player.playerId);
+            if (collected > 0) {
+              console.log(`Player ${player.username} auto-collected ${collected} spice`);
+            }
+          }
+        }
+      }
     }
 
     // VS3: Update spice harvesting
     this.spiceManager.update(deltaTime);
 
+    // VS4: Update thumpers and loot drops
     this.room.updateThumpers();
+    this.room.updateLoot();
     
     const activeThumpers = this.room.getActiveThumpers();
     for (const thumper of activeThumpers) {
@@ -198,14 +273,58 @@ export class GameLoop {
         }
       }
     }
+
+    // VS4: Update Harkonnen AI
+    const playerData = players.map(p => ({
+      id: p.playerId,
+      position: p.state.position,
+      state: p.state.state,
+    }));
+    const thumperData = this.room.getActiveThumpers().map(t => ({
+      id: t.id,
+      position: t.position,
+      active: t.active,
+    }));
+    this.harkonnenAI.update(deltaTime, playerData, thumperData);
+
+    // VS4: Cleanup expired alerts
+    this.alertSystem.cleanup();
+
+    // VS4: Apply Harkonnen damage to players and thumpers
+    const shots = this.harkonnenAI.getShotsFired();
+    for (const shot of shots) {
+      if (shot.hit && shot.targetId) {
+        // Check if target is a thumper
+        if (shot.targetType === 'thumper') {
+          this.room.damageThumper(shot.targetId, shot.damage);
+        } else {
+          // Target is a player
+          const player = this.room.getPlayer(shot.targetId);
+          if (player && player.state.state !== PlayerStateEnum.DEAD) {
+            const damageResult = this.combatSystem.applyDamage(
+              player.health,
+              shot.damage,
+              shot.targetId
+            );
+
+            player.health = damageResult.healthRemaining;
+
+            if (damageResult.killed) {
+              this.handlePlayerDeath(player.playerId);
+            }
+          }
+        }
+      }
+    }
   }
 
   private broadcastState() {
     const players = this.room.getAllPlayers();
     const worms = this.wormAI.getWorms();
     const thumpers = this.room.getThumpers();
+    const lootDrops = this.room.getLootDrops(); // VS4: Loot drops
     const objective = this.objectiveManager.getActiveObjective();
-    
+
     for (const player of players) {
       const stateMessage = {
         type: 'S_STATE',
@@ -214,6 +333,7 @@ export class GameLoop {
         players: players.map(p => p.state),
         worms,
         thumpers,
+        lootDrops, // VS4: Include loot drops in state
         objective: objective ? {
           id: objective.id,
           type: objective.type,
@@ -223,7 +343,7 @@ export class GameLoop {
           status: objective.status,
         } : undefined,
       };
-      
+
       player.socket.emit('state', stateMessage);
     }
   }
@@ -301,6 +421,96 @@ export class GameLoop {
   }
 
   /**
+   * VS4: Handle player shooting at Harkonnen
+   */
+  handlePlayerShoot(playerId: string, targetPosition: { x: number; y: number; z: number }): { success: boolean; hit: boolean; damage?: number; targetId?: string; reason?: string } {
+    const player = this.room.getPlayer(playerId);
+    if (!player) {
+      return { success: false, hit: false, reason: 'Player not found' };
+    }
+
+    if (player.state.state === PlayerStateEnum.DEAD) {
+      return { success: false, hit: false, reason: 'Player is dead' };
+    }
+
+    const now = Date.now();
+
+    // Check fire rate cooldown
+    const canFire = this.combatSystem.canFire(
+      WeaponType.PLAYER_RIFLE,
+      player.lastFireTime,
+      now
+    );
+
+    if (!canFire) {
+      return { success: false, hit: false, reason: 'Fire rate cooldown' };
+    }
+
+    // Find nearest Harkonnen in line of fire
+    const troopers = this.harkonnenAI.getTroopers();
+    let nearestTrooper: { id: string; position: { x: number; y: number; z: number }; distance: number } | null = null;
+    let minDistance = Infinity;
+
+    for (const trooper of troopers) {
+      if (trooper.state === HarkonnenState.DEAD) continue;
+
+      const distance = Math.sqrt(
+        (trooper.position.x - targetPosition.x) ** 2 +
+        (trooper.position.y - targetPosition.y) ** 2 +
+        (trooper.position.z - targetPosition.z) ** 2
+      );
+
+      if (distance < 5 && distance < minDistance) { // Within 5m of target point
+        minDistance = distance;
+        nearestTrooper = { id: trooper.id, position: trooper.position, distance };
+      }
+    }
+
+    if (!nearestTrooper) {
+      player.lastFireTime = now;
+      return { success: true, hit: false, reason: 'No target in range' };
+    }
+
+    // Shoot at nearest trooper
+    const shootResult = this.combatSystem.playerShoot(
+      player.state.position,
+      nearestTrooper.position,
+      nearestTrooper.id,
+      true // TODO: proper line of sight check
+    );
+
+    player.lastFireTime = now;
+
+    if (shootResult.hit && shootResult.targetId) {
+      // Apply damage to Harkonnen
+      const damageResult = this.harkonnenAI.applyDamage(shootResult.targetId, shootResult.damage);
+
+      // VS4: Remove trooper from outpost when killed and spawn loot
+      if (damageResult.killed && damageResult.position) {
+        const trooper = this.harkonnenAI.getTrooper(shootResult.targetId);
+        if (trooper && trooper.outpostId) {
+          this.outpostManager.removeTrooperFromOutpost(trooper.outpostId, shootResult.targetId);
+        }
+
+        // VS4: Spawn loot drop at trooper death position
+        const spiceAmount = Math.floor(Math.random() * 21) + 10; // 10-30 spice
+        this.room.spawnLoot(damageResult.position, spiceAmount);
+      }
+
+      console.log(`Player ${playerId} ${damageResult.killed ? 'killed' : 'hit'} Harkonnen ${shootResult.targetId} for ${shootResult.damage} damage`);
+
+      return {
+        success: true,
+        hit: true,
+        damage: shootResult.damage,
+        targetId: shootResult.targetId,
+      };
+    }
+
+    return { success: true, hit: false, reason: 'Shot missed' };
+  }
+
+  /**
    * VS3: Handle player death
    */
   private handlePlayerDeath(playerId: string): void {
@@ -349,5 +559,24 @@ export class GameLoop {
     );
 
     console.log(`Player ${playerId} completed objective: +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE} spice, +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_WATER} water`);
+  }
+
+  /**
+   * Public accessors for testing
+   */
+  getOutpostManager(): OutpostManager {
+    return this.outpostManager;
+  }
+
+  getHarkonnenAI(): HarkonnenAI {
+    return this.harkonnenAI;
+  }
+
+  getOasisManager(): OasisManager {
+    return this.oasisManager;
+  }
+
+  getAlertSystem(): AlertSystem {
+    return this.alertSystem;
   }
 }
