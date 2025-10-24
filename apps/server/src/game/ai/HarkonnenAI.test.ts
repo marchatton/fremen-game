@@ -692,4 +692,180 @@ describe('VS4: Harkonnen AI System', () => {
       expect(trooper.state).toBe(HarkonnenState.PATROL);
     });
   });
+
+  describe('Thumper Jamming', () => {
+    it('should detect thumper within vision range', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0; // Facing +Z
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 50 }, active: true }
+      ];
+
+      ai.update(1, [], thumpers);
+
+      // Trooper should detect and target the thumper
+      expect(trooper.targetThumperId).toBe('thumper-1');
+    });
+
+    it('should not detect thumper beyond detection range', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 150 }, active: true } // Beyond 100m detection range
+      ];
+
+      ai.update(1, [], thumpers);
+
+      expect(trooper.targetThumperId).toBeUndefined();
+      expect(trooper.state).toBe(HarkonnenState.PATROL);
+    });
+
+    it('should not detect inactive thumpers', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 50 }, active: false }
+      ];
+
+      ai.update(1, [], thumpers);
+
+      expect(trooper.targetThumperId).toBeUndefined();
+    });
+
+    it('should prioritize thumper over player when in PATROL state', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+
+      const players = [
+        { id: 'player-1', position: { x: 0, y: 0, z: 30 }, state: 'ACTIVE' }
+      ];
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 50 }, active: true }
+      ];
+
+      ai.update(1, players, thumpers);
+
+      // Should target thumper, not player
+      expect(trooper.targetThumperId).toBe('thumper-1');
+      expect(trooper.targetPlayerId).toBeUndefined();
+    });
+
+    it('should shoot at thumper when targeted', () => {
+      vi.setSystemTime(1000000);
+
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+      trooper.state = HarkonnenState.COMBAT; // Must be in COMBAT state to shoot
+      trooper.targetThumperId = 'thumper-1';
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 30 }, active: true } // Within 40m combat range
+      ];
+
+      // Mock Math.random to ensure hit
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      ai.update(1, [], thumpers);
+
+      const shots = ai.getShotsFired();
+      expect(shots.length).toBeGreaterThan(0);
+
+      const thumperShot = shots.find(s => s.targetType === 'thumper' && s.targetId === 'thumper-1');
+      expect(thumperShot).toBeDefined();
+      expect(thumperShot?.hit).toBe(true);
+      expect(thumperShot?.damage).toBe(20);
+    });
+
+    it('should clear target when thumper becomes inactive', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+      trooper.state = HarkonnenState.COMBAT; // Must be in COMBAT state to check thumper target
+      trooper.targetThumperId = 'thumper-1';
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 50 }, active: false }
+      ];
+
+      ai.update(1, [], thumpers);
+
+      expect(trooper.targetThumperId).toBeUndefined();
+      expect(trooper.state).toBe(HarkonnenState.PATROL);
+    });
+
+    it('should detect first thumper when multiple in range', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 60 }, active: true },
+        { id: 'thumper-2', position: { x: 0, y: 0, z: 50 }, active: true },
+        { id: 'thumper-3', position: { x: 0, y: 0, z: 70 }, active: true }
+      ];
+
+      ai.update(1, [], thumpers);
+
+      // Should target first thumper detected (thumper-1, since it's first in the array and within 100m)
+      expect(trooper.targetThumperId).toBe('thumper-1');
+      expect(trooper.state).toBe(HarkonnenState.COMBAT);
+    });
+
+    it('should transition from player to thumper when thumper is closer', () => {
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+      trooper.state = HarkonnenState.COMBAT;
+      trooper.targetPlayerId = 'player-1';
+
+      const players = [
+        { id: 'player-1', position: { x: 0, y: 0, z: 100 }, state: 'ACTIVE' }
+      ];
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 30 }, active: true }
+      ];
+
+      // In COMBAT state, trooper should keep targeting player, not switch to thumper
+      ai.update(1, players, thumpers);
+
+      expect(trooper.targetPlayerId).toBe('player-1');
+      expect(trooper.targetThumperId).toBeUndefined();
+    });
+
+    it('should respect fire rate cooldown when shooting thumpers', () => {
+      vi.setSystemTime(1000000);
+
+      const trooper = ai.spawnTrooper('trooper-1', { x: 0, y: 0, z: 0 }, []);
+      trooper.heading = 0;
+      trooper.state = HarkonnenState.COMBAT; // Must be in COMBAT state to shoot
+      trooper.targetThumperId = 'thumper-1';
+
+      const thumpers = [
+        { id: 'thumper-1', position: { x: 0, y: 0, z: 30 }, active: true } // Within 40m combat range
+      ];
+
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      // First shot
+      ai.update(1, [], thumpers);
+      let shots = ai.getShotsFired();
+      expect(shots.filter(s => s.targetId === 'thumper-1').length).toBe(1);
+
+      // Immediate second update (within 1000ms cooldown)
+      ai.update(0.5, [], thumpers);
+      shots = ai.getShotsFired();
+      // Should not have new shot (cooldown) - shotsFired is cleared each update
+      expect(shots.filter(s => s.targetId === 'thumper-1').length).toBe(0);
+
+      // Advance time past cooldown
+      vi.advanceTimersByTime(1100); // Advance past 1000ms fire rate
+      vi.setSystemTime(1001100); // Also advance system time
+      ai.update(1, [], thumpers);
+      shots = ai.getShotsFired();
+      // Should have new shot
+      expect(shots.filter(s => s.targetId === 'thumper-1').length).toBe(1);
+    });
+  });
 });

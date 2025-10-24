@@ -130,6 +130,104 @@ describe('Room', () => {
     expect(restoredPlayer?.state.position.x).toBe(100);
   });
 
+  // VS4: Thumper Damage Tests
+  describe('Thumper Damage', () => {
+    it('should damage thumper and reduce health', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      room.deployThumper('player1');
+
+      const thumpers = room.getThumpers();
+      const thumperId = thumpers[0].id;
+
+      const result = room.damageThumper(thumperId, 25);
+
+      expect(result).toBe(true);
+      expect(thumpers[0].health).toBe(75);
+      expect(thumpers[0].active).toBe(true);
+    });
+
+    it('should disable thumper when health reaches 0', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      room.deployThumper('player1');
+
+      const thumpers = room.getThumpers();
+      const thumperId = thumpers[0].id;
+
+      const result = room.damageThumper(thumperId, 100);
+
+      expect(result).toBe(true);
+      expect(thumpers[0].health).toBe(0);
+      expect(thumpers[0].active).toBe(false);
+    });
+
+    it('should not reduce health below 0', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      room.deployThumper('player1');
+
+      const thumpers = room.getThumpers();
+      const thumperId = thumpers[0].id;
+
+      room.damageThumper(thumperId, 150);
+
+      expect(thumpers[0].health).toBe(0);
+    });
+
+    it('should return false for non-existent thumper', () => {
+      const result = room.damageThumper('invalid-id', 25);
+
+      expect(result).toBe(false);
+    });
+
+    it('should get specific thumper by id', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      room.deployThumper('player1');
+
+      const thumpers = room.getThumpers();
+      const thumperId = thumpers[0].id;
+
+      const thumper = room.getThumper(thumperId);
+
+      expect(thumper).toBeDefined();
+      expect(thumper?.id).toBe(thumperId);
+      expect(thumper?.health).toBe(100);
+    });
+
+    it('should return undefined for non-existent thumper', () => {
+      const thumper = room.getThumper('invalid-id');
+
+      expect(thumper).toBeUndefined();
+    });
+
+    it('should handle multiple damage applications', () => {
+      room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      room.deployThumper('player1');
+
+      const thumpers = room.getThumpers();
+      const thumperId = thumpers[0].id;
+
+      // Damage multiple times (5 shots of 20 damage each = 100)
+      room.damageThumper(thumperId, 20);
+      expect(thumpers[0].health).toBe(80);
+      expect(thumpers[0].active).toBe(true);
+
+      room.damageThumper(thumperId, 20);
+      expect(thumpers[0].health).toBe(60);
+      expect(thumpers[0].active).toBe(true);
+
+      room.damageThumper(thumperId, 20);
+      expect(thumpers[0].health).toBe(40);
+      expect(thumpers[0].active).toBe(true);
+
+      room.damageThumper(thumperId, 20);
+      expect(thumpers[0].health).toBe(20);
+      expect(thumpers[0].active).toBe(true);
+
+      room.damageThumper(thumperId, 20);
+      expect(thumpers[0].health).toBe(0);
+      expect(thumpers[0].active).toBe(false);
+    });
+  });
+
   // VS4: Loot Drop Tests
   describe('Loot Drops', () => {
     it('should spawn loot at position', () => {
