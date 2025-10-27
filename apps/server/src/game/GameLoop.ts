@@ -1,5 +1,5 @@
 import { GAME_CONSTANTS, PlayerStateEnum, ECONOMY_CONSTANTS } from '@fremen/shared';
-import type { Room } from './Room';
+import type { Room, RoomPlayer } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
 import { WormDamage } from './sim/WormDamage';
@@ -11,6 +11,7 @@ import { EquipmentManager } from './EquipmentManager';
 import { SietchManager } from './SietchManager';
 import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
+import type { PlayerRepository } from './PlayerRepository';
 
 export class GameLoop {
   private room: Room;
@@ -31,8 +32,9 @@ export class GameLoop {
   private tickCount = 0;
   private lastTickTime = Date.now();
   private intervalId?: NodeJS.Timeout;
+  private persistence?: PlayerRepository;
 
-  constructor(room: Room, seed: number) {
+  constructor(room: Room, seed: number, persistence?: PlayerRepository) {
     this.room = room;
     this.physics = new Physics(seed);
     this.wormAI = new WormAI();
@@ -48,6 +50,7 @@ export class GameLoop {
     this.sietchManager = new SietchManager();
     this.rewardManager = new RewardManager();
     this.deathManager = new DeathManager();
+    this.persistence = persistence;
 
     // Generate world content
     this.spiceManager.generateNodes();
@@ -198,6 +201,10 @@ export class GameLoop {
         }
       }
     }
+
+    for (const player of players) {
+      this.queuePersistenceUpdate(player);
+    }
   }
 
   private broadcastState() {
@@ -264,6 +271,7 @@ export class GameLoop {
 
     // VS3: Track worms ridden stat
     player.resources.stats = this.rewardManager.incrementWormsRidden(player.resources.stats);
+    this.queuePersistenceUpdate(player);
 
     return { success: true };
   }
@@ -291,6 +299,7 @@ export class GameLoop {
     this.wormAI.dismountWorm(player.state.ridingWormId);
     player.state.state = PlayerStateEnum.ACTIVE;
     player.state.ridingWormId = undefined;
+    this.queuePersistenceUpdate(player);
 
     return { success: true };
   }
@@ -319,12 +328,13 @@ export class GameLoop {
     player.state.state = PlayerStateEnum.DEAD;
     player.state.position = { ...deathResult.respawnPosition };
     player.resources.water = deathResult.respawnWater;
-    player.resources.spice = deathResult.spiceRemaining;
+   player.resources.spice = deathResult.spiceRemaining;
     player.resources.stats = deathResult.newStats;
     player.health = deathResult.respawnHealth;
 
     // Reset to active state (respawn)
     player.state.state = PlayerStateEnum.ACTIVE;
+    this.queuePersistenceUpdate(player);
 
     console.log(`Player ${playerId} died and respawned at Sietch`);
   }
@@ -347,7 +357,21 @@ export class GameLoop {
       player.resources.stats,
       ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE
     );
+    this.queuePersistenceUpdate(player);
 
     console.log(`Player ${playerId} completed objective: +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE} spice, +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_WATER} water`);
+  }
+
+  private queuePersistenceUpdate(player: RoomPlayer): void {
+    this.persistence?.updateSnapshot(player.playerId, {
+      position: { ...player.state.position },
+      resources: {
+        water: player.resources.water,
+        spice: player.resources.spice,
+        equipment: { ...player.resources.equipment },
+        stats: { ...player.resources.stats },
+        inventory: player.resources.inventory ? [...player.resources.inventory] : [],
+      },
+    });
   }
 }

@@ -4,16 +4,19 @@ import { Room } from './Room';
 import { PlayerStateEnum, WormAIState, GAME_CONSTANTS } from '@fremen/shared';
 import type { Socket } from 'socket.io';
 import { vi } from 'vitest';
+import { InMemoryPlayerRepository } from './testing/InMemoryPlayerRepository';
 
 describe('VS2: Mount/Dismount System', () => {
   let room: Room;
   let gameLoop: GameLoop;
   let mockSocket1: Partial<Socket>;
   let mockSocket2: Partial<Socket>;
+  let repository: InMemoryPlayerRepository;
 
   beforeEach(() => {
-    room = new Room('test-room');
-    gameLoop = new GameLoop(room, 12345);
+    repository = new InMemoryPlayerRepository();
+    room = new Room('test-room', repository);
+    gameLoop = new GameLoop(room, 12345, repository);
 
     mockSocket1 = {
       id: 'socket-1',
@@ -27,8 +30,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Mounting Validation', () => {
-    it('should allow player to mount worm within range', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should allow player to mount worm within range', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // Position player near worm head (worm spawns at ~50, 0, 50)
@@ -41,8 +44,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.ridingWormId).toBe('worm-0');
     });
 
-    it('should reject mount attempt when too far from worm', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reject mount attempt when too far from worm', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // Position player far from worm
@@ -56,8 +59,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.ridingWormId).toBeUndefined();
     });
 
-    it('should reject mount attempt at exactly WORM_MOUNT_DISTANCE + 0.1m (boundary test)', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reject mount attempt at exactly WORM_MOUNT_DISTANCE + 0.1m (boundary test)', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // Position at exactly 5.1m away (just over the limit)
@@ -69,8 +72,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.reason).toBe('Too far from worm');
     });
 
-    it('should allow mount at exactly WORM_MOUNT_DISTANCE (boundary test)', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should allow mount at exactly WORM_MOUNT_DISTANCE (boundary test)', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // Get actual worm position first
@@ -86,8 +89,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.success).toBe(true);
     });
 
-    it('should reject mount when player is already riding', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reject mount when player is already riding', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -101,8 +104,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.reason).toBe('Already mounted');
     });
 
-    it('should reject mount when worm does not exist', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reject mount when worm does not exist', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -112,7 +115,7 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.reason).toBe('Worm not found');
     });
 
-    it('should reject mount when player does not exist', () => {
+    it('should reject mount when player does not exist', async () => {
       const result = gameLoop.handleMountAttempt('nonexistent', 'worm-0');
 
       expect(result.success).toBe(false);
@@ -121,9 +124,9 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Mounting Race Conditions', () => {
-    it('should prevent two players from mounting the same worm', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'Player1');
-      room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
+    it('should prevent two players from mounting the same worm', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'Player1');
+      await room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
 
       const player1 = room.getPlayer('player1')!;
       const player2 = room.getPlayer('player2')!;
@@ -146,9 +149,9 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player2.state.state).toBe(PlayerStateEnum.ACTIVE);
     });
 
-    it('should allow different players to mount after dismount', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'Player1');
-      room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
+    it('should allow different players to mount after dismount', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'Player1');
+      await room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
 
       const player1 = room.getPlayer('player1')!;
       const player2 = room.getPlayer('player2')!;
@@ -168,8 +171,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Mount State Changes', () => {
-    it('should set player velocity to zero when mounting', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should set player velocity to zero when mounting', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -180,8 +183,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.velocity).toEqual({ x: 0, y: 0, z: 0 });
     });
 
-    it('should set worm state to RIDDEN_BY when mounted', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should set worm state to RIDDEN_BY when mounted', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -195,8 +198,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(worm.riderId).toBe('player1');
     });
 
-    it('should reset worm speed to default (15) when mounted', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reset worm speed to default (15) when mounted', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -210,8 +213,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Dismounting Validation', () => {
-    it('should allow player to dismount while riding', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should allow player to dismount while riding', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -223,8 +226,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.ridingWormId).toBeUndefined();
     });
 
-    it('should reject dismount when not riding', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should reject dismount when not riding', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
 
       const result = gameLoop.handleDismount('player1');
 
@@ -232,15 +235,15 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.reason).toBe('Not mounted');
     });
 
-    it('should reject dismount when player does not exist', () => {
+    it('should reject dismount when player does not exist', async () => {
       const result = gameLoop.handleDismount('nonexistent');
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe('Player not found');
     });
 
-    it('should allow double dismount attempt gracefully (idempotency)', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should allow double dismount attempt gracefully (idempotency)', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -255,8 +258,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Dismount State Changes', () => {
-    it('should eject player 3m to the right of worm', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should eject player 3m to the right of worm', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -275,8 +278,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.position.z).toBe(headZ);
     });
 
-    it('should return worm to PATROLLING state after dismount', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should return worm to PATROLLING state after dismount', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -290,8 +293,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(worm.riderId).toBeUndefined();
     });
 
-    it('should assign new patrol target to worm after dismount', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should assign new patrol target to worm after dismount', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -309,8 +312,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('Edge Cases', () => {
-    it('should handle dismount when worm no longer exists', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should handle dismount when worm no longer exists', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -327,8 +330,8 @@ describe('VS2: Mount/Dismount System', () => {
       // Position won't be updated since worm doesn't exist, but state should still clear
     });
 
-    it('should handle mount with invalid wormId format', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should handle mount with invalid wormId format', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -338,8 +341,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(result.reason).toBe('Worm not found');
     });
 
-    it('should handle mount when player position has NaN values', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should handle mount when player position has NaN values', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: NaN, y: 0, z: 50 };
 
@@ -354,8 +357,8 @@ describe('VS2: Mount/Dismount System', () => {
   });
 
   describe('State Synchronization', () => {
-    it('should maintain player position while riding during game loop update', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should maintain player position while riding during game loop update', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -374,8 +377,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.position.z).toBe(segment2.z);
     });
 
-    it('should not apply physics validation while player is riding', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should not apply physics validation while player is riding', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 
@@ -390,8 +393,8 @@ describe('VS2: Mount/Dismount System', () => {
       expect(player.state.velocity).toEqual({ x: 0, y: 0, z: 0 });
     });
 
-    it('should handle worm with insufficient control points gracefully', () => {
-      room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
+    it('should handle worm with insufficient control points gracefully', async () => {
+      await room.addPlayer(mockSocket1 as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
       player.state.position = { x: 52, y: 0, z: 50 };
 

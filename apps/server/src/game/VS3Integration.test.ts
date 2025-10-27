@@ -4,17 +4,20 @@ import { GameLoop } from './GameLoop';
 import type { RoomPlayer } from './Room';
 import { PlayerStateEnum, ECONOMY_CONSTANTS, EquipmentType, EQUIPMENT_CATALOG } from '@fremen/shared';
 import type { Socket } from 'socket.io';
+import { InMemoryPlayerRepository } from './testing/InMemoryPlayerRepository';
 
 describe('VS3: Resource Loop Integration (End-to-End)', () => {
   let room: Room;
   let gameLoop: GameLoop;
   let player: RoomPlayer;
+  let repository: InMemoryPlayerRepository;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
 
-    room = new Room('test-room');
-    gameLoop = new GameLoop(room, 12345);
+    repository = new InMemoryPlayerRepository();
+    room = new Room('test-room', repository);
+    gameLoop = new GameLoop(room, 12345, repository);
 
     const mockSocket = {
       emit: vi.fn(),
@@ -22,7 +25,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       disconnect: vi.fn(),
     } as unknown as Socket;
 
-    room.addPlayer(mockSocket, 'player1', 'TestPlayer');
+    await room.addPlayer(mockSocket, 'player1', 'TestPlayer');
     player = room.getPlayer('player1')!;
 
     gameLoop.start();
@@ -34,7 +37,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Spice Harvesting Flow', () => {
-    it('should complete full harvest cycle: find node → start harvest → wait 3s → complete', () => {
+    it('should complete full harvest cycle: find node → start harvest → wait 3s → complete', async () => {
       // Find nearby spice node
       const nodes = (gameLoop as any).spiceManager.getNodes();
       const nearbyNode = nodes.find((n: any) =>
@@ -72,7 +75,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       // In actual integration, this would be handled by a handler
     });
 
-    it('should handle multiple harvest cycles on same node', () => {
+    it('should handle multiple harvest cycles on same node', async () => {
       const nodes = (gameLoop as any).spiceManager.getNodes();
       const node = nodes[0];
       player.state.position = { ...node.position };
@@ -100,7 +103,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(totalHarvested).toBeGreaterThan(0);
     });
 
-    it('should deplete node and trigger respawn timer', () => {
+    it('should deplete node and trigger respawn timer', async () => {
       const nodes = (gameLoop as any).spiceManager.getNodes();
       const node = nodes[0];
       player.state.position = { ...node.position };
@@ -127,7 +130,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Water Depletion & Survival', () => {
-    it('should deplete water over time during active gameplay', () => {
+    it('should deplete water over time during active gameplay', async () => {
       const initialWater = player.resources.water;
       player.state.state = PlayerStateEnum.ACTIVE;
 
@@ -140,7 +143,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.water).toBeLessThan(initialWater);
     });
 
-    it('should deplete water faster when running', () => {
+    it('should deplete water faster when running', async () => {
       player.state.state = PlayerStateEnum.ACTIVE;
       player.state.velocity = { x: 10, y: 0, z: 10 }; // Running
 
@@ -156,7 +159,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(waterLost).toBeGreaterThan(3); // Should lose significant water
     });
 
-    it('should deplete water slower when riding worm', () => {
+    it('should deplete water slower when riding worm', async () => {
       // Mount worm
       const worms = (gameLoop as any).wormAI.getWorms();
       const worm = worms[0];
@@ -182,7 +185,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(waterLost).toBeLessThan(1); // Minimal water loss
     });
 
-    it('should reduce water depletion with stillsuit equipped', () => {
+    it('should reduce water depletion with stillsuit equipped', async () => {
       // Equip basic stillsuit from catalog
       player.resources.equipment.body = EQUIPMENT_CATALOG['basic-stillsuit'];
 
@@ -211,7 +214,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(waterWithSuit).toBeGreaterThan(waterWithoutSuit);
     });
 
-    it('should apply health drain when water is critically low', () => {
+    it('should apply health drain when water is critically low', async () => {
       player.resources.water = 5; // Severe thirst
       const initialHealth = player.health;
 
@@ -226,7 +229,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Oasis Refill System', () => {
-    it('should refill water at oasis', () => {
+    it('should refill water at oasis', async () => {
       const oases = (gameLoop as any).oasisManager.getOases();
       const oasis = oases[0];
 
@@ -246,7 +249,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(result.newWater).toBeLessThanOrEqual(100);
     });
 
-    it('should enforce 5-minute cooldown per oasis', () => {
+    it('should enforce 5-minute cooldown per oasis', async () => {
       const oases = (gameLoop as any).oasisManager.getOases();
       const oasis = oases[0];
 
@@ -285,7 +288,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(result3.success).toBe(true);
     });
 
-    it('should allow visiting different oases without cooldown', () => {
+    it('should allow visiting different oases without cooldown', async () => {
       const oases = (gameLoop as any).oasisManager.getOases();
       player.resources.water = 30;
 
@@ -312,7 +315,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Merchant & Equipment System', () => {
-    it('should allow buying equipment at Sietch', () => {
+    it('should allow buying equipment at Sietch', async () => {
       const sietchPos = (gameLoop as any).sietchManager.getSietchPosition();
       player.state.position = { ...sietchPos };
       player.resources.spice = 100;
@@ -333,7 +336,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(result.inventory.length).toBeGreaterThan(0);
     });
 
-    it('should reject trade outside Sietch safe zone', () => {
+    it('should reject trade outside Sietch safe zone', async () => {
       player.state.position = { x: 500, y: 0, z: 500 }; // Far away
       player.resources.spice = 100;
 
@@ -341,7 +344,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(canTrade).toBe(false);
     });
 
-    it('should allow selling equipment for spice', () => {
+    it('should allow selling equipment for spice', async () => {
       // Clear inventory and add only stillsuit
       player.resources.inventory = [{
         id: 'inv-1',
@@ -365,7 +368,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(result.inventory.length).toBe(0);
     });
 
-    it('should equip item from inventory and apply stats', () => {
+    it('should equip item from inventory and apply stats', async () => {
       // Clear inventory and add only stillsuit
       player.resources.inventory = [{
         id: 'inv-1',
@@ -393,7 +396,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Objective Completion & Rewards', () => {
-    it('should grant rewards when completing objective on worm', () => {
+    it('should grant rewards when completing objective on worm', async () => {
       const worms = (gameLoop as any).wormAI.getWorms();
       const worm = worms[0];
       worm.controlPoints = [
@@ -427,7 +430,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Death & Respawn System', () => {
-    it('should trigger death when water reaches 0', () => {
+    it('should trigger death when water reaches 0', async () => {
       player.resources.water = 0;
       player.state.position = { x: 100, y: 0, z: 200 };
       const initialSpice = player.resources.spice = 100;
@@ -444,7 +447,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.stats.deaths).toBe(1);
     });
 
-    it('should create corpse marker with dropped spice', () => {
+    it('should create corpse marker with dropped spice', async () => {
       player.resources.water = 0;
       player.resources.spice = 100;
       player.state.position = { x: 100, y: 0, z: 200 };
@@ -460,7 +463,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(playerCorpse.position.z).toBeCloseTo(200, 0);
     });
 
-    it('should allow recovering corpse within 2 minutes', () => {
+    it('should allow recovering corpse within 2 minutes', async () => {
       // Die
       player.resources.water = 0;
       player.resources.spice = 100;
@@ -485,7 +488,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(recoveryResult.spiceRecovered).toBe(20);
     });
 
-    it('should expire corpse after 2 minutes', () => {
+    it('should expire corpse after 2 minutes', async () => {
       player.resources.water = 0;
       player.resources.spice = 100;
       player.state.position = { x: 100, y: 0, z: 200 };
@@ -502,7 +505,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(expiredCorpse).toBeUndefined();
     });
 
-    it('should trigger death from health drain at low water', () => {
+    it('should trigger death from health drain at low water', async () => {
       player.resources.water = 5; // Severe thirst
       player.health = 10;
       player.state.position = { x: 100, y: 0, z: 200 };
@@ -521,7 +524,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Stat Tracking', () => {
-    it('should track distance traveled', () => {
+    it('should track distance traveled', async () => {
       const initialDistance = player.resources.stats.distanceTraveled;
 
       player.state.position = { x: 0, y: 0, z: 0 };
@@ -536,7 +539,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.stats.distanceTraveled).toBeGreaterThan(initialDistance);
     });
 
-    it('should track worms ridden stat on mount', () => {
+    it('should track worms ridden stat on mount', async () => {
       const initialWormsRidden = player.resources.stats.wormsRidden;
 
       const worms = (gameLoop as any).wormAI.getWorms();
@@ -553,7 +556,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.stats.wormsRidden).toBe(initialWormsRidden + 1);
     });
 
-    it('should not increment worms ridden on failed mount', () => {
+    it('should not increment worms ridden on failed mount', async () => {
       const initialWormsRidden = player.resources.stats.wormsRidden;
 
       const result = gameLoop.handleMountAttempt('player1', 'nonexistent-worm');
@@ -661,7 +664,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
   });
 
   describe('Multi-System Interactions', () => {
-    it('should reduce water loss significantly with advanced stillsuit', () => {
+    it('should reduce water loss significantly with advanced stillsuit', async () => {
       // Equip advanced stillsuit (75% reduction)
       player.resources.equipment.body = EQUIPMENT_CATALOG['advanced-stillsuit'];
 
@@ -677,7 +680,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.water).toBeGreaterThan(95);
     });
 
-    it('should handle oasis hopping strategy to maintain water', () => {
+    it('should handle oasis hopping strategy to maintain water', async () => {
       const oases = (gameLoop as any).oasisManager.getOases();
       player.resources.water = 50;
 
@@ -698,7 +701,7 @@ describe('VS3: Resource Loop Integration (End-to-End)', () => {
       expect(player.resources.water).toBe(100);
     });
 
-    it('should allow upgrading equipment: sell basic → buy improved', () => {
+    it('should allow upgrading equipment: sell basic → buy improved', async () => {
       const sietchPos = (gameLoop as any).sietchManager.getSietchPosition();
       player.state.position = { ...sietchPos };
 
