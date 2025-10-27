@@ -7,6 +7,7 @@ import { generateToken, verifyToken } from './auth/jwt';
 import { Room } from './game/Room';
 import { GameLoop } from './game/GameLoop';
 import { RateLimiter } from './game/RateLimiter';
+import { createDbPlayerRepository } from './game/PlayerRepository';
 
 const PORT = process.env.PORT || 3000;
 
@@ -45,8 +46,9 @@ app.get('/auth/token', (req, res) => {
 });
 
 const WORLD_SEED = 12345;
-const mainRoom = new Room('main');
-const gameLoop = new GameLoop(mainRoom, WORLD_SEED);
+const playerRepository = createDbPlayerRepository();
+const mainRoom = new Room('main', playerRepository);
+const gameLoop = new GameLoop(mainRoom, WORLD_SEED, playerRepository);
 const chatRateLimiter = new RateLimiter();
 
 gameLoop.start();
@@ -67,11 +69,11 @@ io.use((socket, next) => {
   next();
 });
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   const { playerId, username } = socket.data;
   console.log(`Client connected: ${username} (${playerId})`);
 
-  const added = mainRoom.addPlayer(socket, playerId, username);
+  const added = await mainRoom.addPlayer(socket, playerId, username);
   if (!added) {
     socket.emit('error', { message: 'Room is full' });
     socket.disconnect();
@@ -87,7 +89,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${username} (${playerId})`);
-    mainRoom.removePlayer(playerId);
+    void mainRoom.removePlayer(playerId);
   });
 
   socket.on('input', (data) => {

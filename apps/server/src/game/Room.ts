@@ -2,6 +2,7 @@ import type { Socket } from 'socket.io';
 import type { PlayerState, ThumperState, PlayerResources } from '@fremen/shared';
 import { GAME_CONSTANTS, PlayerStateEnum, STARTING_RESOURCES } from '@fremen/shared';
 import { v4 as uuidv4 } from 'uuid';
+import type { PlayerRepository } from './PlayerRepository';
 
 export interface RoomPlayer {
   socket: Socket;
@@ -15,22 +16,54 @@ export interface RoomPlayer {
   thumperCount: number;
 }
 
+interface DisconnectedPlayerData {
+  state: PlayerState;
+  resources: PlayerResources;
+  disconnectedAt: number;
+}
+
+function cloneResources(resources: PlayerResources): PlayerResources {
+  return {
+    water: resources.water,
+    spice: resources.spice,
+    equipment: { ...resources.equipment },
+    stats: { ...resources.stats },
+    inventory: resources.inventory ? [...resources.inventory] : [],
+  };
+}
+
+function materializeStartingResources(): PlayerResources {
+  return {
+    water: STARTING_RESOURCES.water ?? 100,
+    spice: STARTING_RESOURCES.spice ?? 0,
+    equipment: { ...(STARTING_RESOURCES.equipment ?? {}) },
+    stats: { ...(STARTING_RESOURCES.stats ?? {}) },
+    inventory: STARTING_RESOURCES.inventory ? [...STARTING_RESOURCES.inventory] : [],
+  };
+}
+
 export class Room {
   private players: Map<string, RoomPlayer> = new Map();
-  private disconnectedPlayers: Map<string, { state: PlayerState; disconnectedAt: number }> = new Map();
+  private disconnectedPlayers: Map<string, DisconnectedPlayerData> = new Map();
   private thumpers: Map<string, ThumperState> = new Map();
   public roomId: string;
 
-  constructor(roomId: string) {
+  constructor(roomId: string, private readonly repository: PlayerRepository) {
     this.roomId = roomId;
   }
 
-  addPlayer(socket: Socket, playerId: string, username: string): boolean {
+  async addPlayer(socket: Socket, playerId: string, username: string): Promise<boolean> {
     if (this.players.size >= GAME_CONSTANTS.MAX_PLAYERS) {
       return false;
     }
 
     const existingDisconnected = this.disconnectedPlayers.get(playerId);
+    const loadedResources = await this.repository.load(playerId, username);
+    const baseResources = existingDisconnected
+      ? existingDisconnected.resources
+      : loadedResources ?? materializeStartingResources();
+    const playerResources = cloneResources(baseResources);
+
     const initialState: PlayerState = existingDisconnected
       ? existingDisconnected.state
       : {
@@ -41,37 +74,42 @@ export class Room {
           state: PlayerStateEnum.ACTIVE,
         };
 
-    this.players.set(playerId, {
+    const playerData: RoomPlayer = {
       socket,
       playerId,
       username,
       state: initialState,
-      resources: {
-        water: STARTING_RESOURCES.water!,
-        spice: STARTING_RESOURCES.spice!,
-        equipment: STARTING_RESOURCES.equipment!,
-        stats: { ...STARTING_RESOURCES.stats! },
-        inventory: STARTING_RESOURCES.inventory ? [...STARTING_RESOURCES.inventory] : [],
-      },
+      resources: playerResources,
       health: 100,
       lastInputSeq: 0,
       connectedAt: Date.now(),
       thumperCount: 3,
-    });
+    };
 
+    this.players.set(playerId, playerData);
     this.disconnectedPlayers.delete(playerId);
+
+    this.repository.register(playerId, cloneResources(playerData.resources), { ...playerData.state.position });
+
     console.log(`Player ${username} (${playerId}) joined room ${this.roomId}`);
     return true;
   }
 
-  removePlayer(playerId: string) {
+  async removePlayer(playerId: string) {
     const player = this.players.get(playerId);
     if (player) {
-      this.disconnectedPlayers.set(playerId, {
+      const snapshot = {
         state: player.state,
+        resources: cloneResources(player.resources),
         disconnectedAt: Date.now(),
-      });
+      } satisfies DisconnectedPlayerData;
+
+      this.disconnectedPlayers.set(playerId, snapshot);
       this.players.delete(playerId);
+      await this.repository.unregister(playerId, {
+        position: { ...player.state.position },
+        resources: cloneResources(player.resources),
+      });
       console.log(`Player ${player.username} (${playerId}) left room ${this.roomId}`);
     }
   }
@@ -98,7 +136,7 @@ export class Room {
   cleanupDisconnectedPlayers() {
     const now = Date.now();
     const timeout = 5 * 60 * 1000;
-    
+
     for (const [playerId, data] of this.disconnectedPlayers) {
       if (now - data.disconnectedAt > timeout) {
         this.disconnectedPlayers.delete(playerId);
@@ -123,14 +161,14 @@ export class Room {
 
     this.thumpers.set(thumperId, thumper);
     player.thumperCount--;
-    
+
     console.log(`Player ${player.username} deployed thumper ${thumperId} at`, thumper.position);
     return true;
   }
 
   updateThumpers() {
     const now = Date.now();
-    
+
     for (const [id, thumper] of this.thumpers) {
       if (now >= thumper.expiresAt) {
         this.thumpers.delete(id);

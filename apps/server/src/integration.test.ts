@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Room } from './game/Room';
 import { GameLoop } from './game/GameLoop';
 import { generateToken, verifyToken } from './auth/jwt';
+import { InMemoryPlayerRepository } from './game/testing/InMemoryPlayerRepository';
 
 describe('Integration Tests', () => {
   let httpServer: HTTPServer;
@@ -13,6 +14,7 @@ describe('Integration Tests', () => {
   let gameLoop: GameLoop;
   let clientSocket1: ClientSocket;
   let clientSocket2: ClientSocket;
+  let repository: InMemoryPlayerRepository;
   const PORT = 3001;
 
   beforeAll(async () => {
@@ -21,8 +23,9 @@ describe('Integration Tests', () => {
       cors: { origin: '*' },
     });
 
-    room = new Room('test-room');
-    gameLoop = new GameLoop(room, 12345);
+    repository = new InMemoryPlayerRepository();
+    room = new Room('test-room', repository);
+    gameLoop = new GameLoop(room, 12345, repository);
     gameLoop.start();
 
     ioServer.use((socket, next) => {
@@ -41,10 +44,15 @@ describe('Integration Tests', () => {
       next();
     });
 
-    ioServer.on('connection', (socket) => {
+    ioServer.on('connection', async (socket) => {
       const { playerId, username } = socket.data;
-      
-      room.addPlayer(socket, playerId, username);
+
+      const added = await room.addPlayer(socket, playerId, username);
+      if (!added) {
+        socket.emit('error', { message: 'Room is full' });
+        socket.disconnect();
+        return;
+      }
       
       socket.emit('welcome', {
         type: 'S_WELCOME',
@@ -54,7 +62,7 @@ describe('Integration Tests', () => {
       });
 
       socket.on('disconnect', () => {
-        room.removePlayer(playerId);
+        void room.removePlayer(playerId);
       });
 
       socket.on('input', (data) => {
