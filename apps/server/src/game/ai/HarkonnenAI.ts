@@ -1,4 +1,8 @@
 import type { Vector3 } from '@fremen/shared';
+import { COMBAT_CONSTANTS } from '@fremen/shared';
+import { PerceptionModule, type DetectionResult } from './PerceptionModule';
+import { TacticsModule } from './TacticsModule';
+import { TrooperController } from './TrooperController';
 
 export enum HarkonnenState {
   PATROL = 'PATROL',
@@ -45,6 +49,10 @@ interface DetectionResult {
  */
 export class HarkonnenAI {
   private troopers: Map<string, HarkonnenTrooper> = new Map();
+  private combatHandler?: (attackerId: string, targetId: string, damage: number) => void;
+  private readonly controller: TrooperController;
+  private readonly perception: PerceptionModule;
+  private readonly tactics: TacticsModule;
 
   // AI Configuration
   private readonly VISION_RANGE = 50; // meters
@@ -58,6 +66,17 @@ export class HarkonnenAI {
   private readonly PATROL_SPEED = 3; // m/s
   private readonly COMBAT_SPEED = 5; // m/s
   private readonly CORPSE_DURATION = 30000; // 30 seconds
+
+  constructor(
+    controller?: TrooperController,
+    perception?: PerceptionModule,
+    tactics?: TacticsModule
+  ) {
+    this.controller = controller ?? new TrooperController();
+    this.perception =
+      perception ?? new PerceptionModule(this.VISION_RANGE, this.VISION_ANGLE, this.HEARING_RANGE);
+    this.tactics = tactics ?? new TacticsModule(this.controller);
+  }
 
   /**
    * Spawn a new Harkonnen trooper
@@ -107,6 +126,10 @@ export class HarkonnenAI {
     }
   }
 
+  setCombatHandler(handler: (attackerId: string, targetId: string, damage: number) => void): void {
+    this.combatHandler = handler;
+  }
+
   /**
    * AI State Machine
    */
@@ -141,30 +164,8 @@ export class HarkonnenAI {
     deltaTime: number,
     now: number
   ): void {
-    // Check for player detection
     const detection = this.detectPlayers(trooper, players);
-    if (detection.detected) {
-      trooper.state = HarkonnenState.COMBAT;
-      trooper.targetPlayerId = detection.playerId;
-      trooper.lastKnownPlayerPosition = detection.position;
-      trooper.alertedAt = now;
-      console.log(`Trooper ${trooper.id} detected player ${detection.playerId}, entering COMBAT`);
-      return;
-    }
-
-    // Move along patrol path
-    if (trooper.patrolPath.length === 0) return;
-
-    const target = trooper.patrolPath[trooper.currentWaypoint];
-    const distance = this.getDistance(trooper.position, target);
-
-    if (distance < 2) {
-      // Reached waypoint, move to next
-      trooper.currentWaypoint = (trooper.currentWaypoint + 1) % trooper.patrolPath.length;
-    } else {
-      // Move towards waypoint
-      this.moveTowards(trooper, target, this.PATROL_SPEED, deltaTime);
-    }
+    this.tactics.patrol(trooper, detection, deltaTime, now);
   }
 
   /**
@@ -176,37 +177,8 @@ export class HarkonnenAI {
     deltaTime: number,
     now: number
   ): void {
-    // Check if investigation time expired
-    if (trooper.investigateUntil && now > trooper.investigateUntil) {
-      trooper.state = HarkonnenState.PATROL;
-      trooper.investigateUntil = undefined;
-      trooper.lastKnownPlayerPosition = undefined;
-      console.log(`Trooper ${trooper.id} investigation complete, returning to PATROL`);
-      return;
-    }
-
-    // Check for player detection
     const detection = this.detectPlayers(trooper, players);
-    if (detection.detected) {
-      trooper.state = HarkonnenState.COMBAT;
-      trooper.targetPlayerId = detection.playerId;
-      trooper.lastKnownPlayerPosition = detection.position;
-      console.log(`Trooper ${trooper.id} re-acquired target, entering COMBAT`);
-      return;
-    }
-
-    // Move to last known position
-    if (trooper.lastKnownPlayerPosition) {
-      const distance = this.getDistance(trooper.position, trooper.lastKnownPlayerPosition);
-      if (distance < 2) {
-        // Reached search area, wait for investigation timer
-        if (!trooper.investigateUntil) {
-          trooper.investigateUntil = now + this.INVESTIGATE_DURATION;
-        }
-      } else {
-        this.moveTowards(trooper, trooper.lastKnownPlayerPosition, this.COMBAT_SPEED, deltaTime);
-      }
-    }
+    this.tactics.investigate(trooper, detection, deltaTime, now);
   }
 
   /**
@@ -218,49 +190,15 @@ export class HarkonnenAI {
     deltaTime: number,
     now: number
   ): void {
-    // Check health for retreat
-    if (trooper.health < trooper.maxHealth * this.RETREAT_HEALTH_THRESHOLD) {
-      trooper.state = HarkonnenState.RETREAT;
-      trooper.retreatTarget = this.findRetreatPosition(trooper);
-      console.log(`Trooper ${trooper.id} health low, RETREATING`);
-      return;
-    }
-
-    // Find target player
-    const target = players.find(p => p.id === trooper.targetPlayerId);
-    if (!target) {
-      // Target lost, investigate
-      trooper.state = HarkonnenState.INVESTIGATE;
-      trooper.investigateUntil = now + this.INVESTIGATE_DURATION;
-      console.log(`Trooper ${trooper.id} lost target, INVESTIGATING`);
-      return;
-    }
-
-    // Check line of sight
-    const hasLOS = this.hasLineOfSight(trooper.position, target.position);
-    if (hasLOS) {
-      trooper.lastKnownPlayerPosition = { ...target.position };
-    }
-
-    const distance = this.getDistance(trooper.position, target.position);
-
-    // Maintain optimal combat distance
-    if (distance < this.COMBAT_MIN_DISTANCE) {
-      // Too close, back up
-      const retreatPos = this.getRetreatVector(trooper.position, target.position, 5);
-      this.moveTowards(trooper, retreatPos, this.COMBAT_SPEED, deltaTime);
-    } else if (distance > this.COMBAT_MAX_DISTANCE) {
-      // Too far, advance
-      this.moveTowards(trooper, target.position, this.COMBAT_SPEED, deltaTime);
-    }
-
-    // Fire at player if LOS and fire rate allows
-    if (hasLOS && now - trooper.lastFireTime > this.FIRE_RATE) {
-      this.fireAtPlayer(trooper, target.position, now);
-    }
-
-    // Face target
-    this.faceTowards(trooper, target.position);
+    this.tactics.combat(
+      trooper,
+      players,
+      deltaTime,
+      now,
+      (from, to) => this.hasLineOfSight(from, to),
+      (a, b) => this.getDistance(a, b),
+      (actor, targetPos, timestamp) => this.fireAtPlayer(actor, targetPos, timestamp)
+    );
   }
 
   /**
@@ -272,21 +210,7 @@ export class HarkonnenAI {
     deltaTime: number,
     now: number
   ): void {
-    if (!trooper.retreatTarget) {
-      trooper.retreatTarget = this.findRetreatPosition(trooper);
-    }
-
-    const distance = this.getDistance(trooper.position, trooper.retreatTarget);
-
-    if (distance < 5) {
-      // Reached retreat point, return to patrol
-      trooper.state = HarkonnenState.PATROL;
-      trooper.retreatTarget = undefined;
-      trooper.targetPlayerId = undefined;
-      console.log(`Trooper ${trooper.id} retreat complete, returning to PATROL`);
-    } else {
-      this.moveTowards(trooper, trooper.retreatTarget, this.COMBAT_SPEED, deltaTime);
-    }
+    this.tactics.retreat(trooper, deltaTime, () => this.findRetreatPosition(trooper));
   }
 
   /**
@@ -296,37 +220,14 @@ export class HarkonnenAI {
     trooper: HarkonnenTrooper,
     players: Array<{ id: string; position: Vector3; state: string }>
   ): DetectionResult {
-    for (const player of players) {
-      if (player.state === 'DEAD') continue;
-
-      const distance = this.getDistance(trooper.position, player.position);
-
-      // Check hearing range (omnidirectional)
-      if (distance <= this.HEARING_RANGE) {
-        // Simplified: detect any player within hearing range
-        // In full implementation, would check for gunshots/thumpers
-      }
-
-      // Check vision range and cone
-      if (distance <= this.VISION_RANGE) {
-        const angleToPlayer = this.getAngle(trooper.position, player.position);
-        const angleDiff = Math.abs(this.normalizeAngle(angleToPlayer - trooper.rotation));
-
-        if (angleDiff <= (this.VISION_ANGLE * Math.PI / 180) / 2) {
-          // Within vision cone, check line of sight
-          if (this.hasLineOfSight(trooper.position, player.position)) {
-            return {
-              detected: true,
-              playerId: player.id,
-              position: player.position,
-              distance,
-            };
-          }
-        }
-      }
-    }
-
-    return { detected: false };
+    return this.perception.detect(
+      trooper,
+      players,
+      (from, to) => this.hasLineOfSight(from, to),
+      (a, b) => this.getDistance(a, b),
+      (from, to) => this.getAngle(from, to),
+      angle => this.normalizeAngle(angle)
+    );
   }
 
   /**
@@ -353,31 +254,10 @@ export class HarkonnenAI {
    */
   private fireAtPlayer(trooper: HarkonnenTrooper, targetPos: Vector3, now: number): void {
     trooper.lastFireTime = now;
-    // TODO: Integrate with combat system to apply damage
-    console.log(`Trooper ${trooper.id} fired at target`);
-  }
-
-  /**
-   * Move towards target position
-   */
-  private moveTowards(trooper: HarkonnenTrooper, target: Vector3, speed: number, deltaTime: number): void {
-    const dx = target.x - trooper.position.x;
-    const dz = target.z - trooper.position.z;
-    const distance = Math.sqrt(dx * dx + dz * dz);
-
-    if (distance > 0) {
-      const moveDistance = speed * deltaTime;
-      const ratio = Math.min(moveDistance / distance, 1);
-      trooper.position.x += dx * ratio;
-      trooper.position.z += dz * ratio;
+    if (trooper.targetPlayerId) {
+      this.combatHandler?.(trooper.id, trooper.targetPlayerId, COMBAT_CONSTANTS.AI_BASE_DAMAGE);
     }
-  }
-
-  /**
-   * Face towards target
-   */
-  private faceTowards(trooper: HarkonnenTrooper, target: Vector3): void {
-    trooper.rotation = this.getAngle(trooper.position, target);
+    console.log(`Trooper ${trooper.id} fired at target`);
   }
 
   /**
@@ -411,23 +291,6 @@ export class HarkonnenAI {
   private hasLineOfSight(from: Vector3, to: Vector3): boolean {
     // TODO: Implement proper raycast with terrain collision
     return true;
-  }
-
-  /**
-   * Get retreat vector (opposite direction from threat)
-   */
-  private getRetreatVector(from: Vector3, threat: Vector3, distance: number): Vector3 {
-    const dx = from.x - threat.x;
-    const dz = from.z - threat.z;
-    const length = Math.sqrt(dx * dx + dz * dz);
-
-    if (length === 0) return { ...from, y: 0 };
-
-    return {
-      x: from.x + (dx / length) * distance,
-      y: 0,
-      z: from.z + (dz / length) * distance,
-    };
   }
 
   /**

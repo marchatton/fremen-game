@@ -53,6 +53,11 @@ describe('Integration Tests', () => {
         socket.disconnect();
         return;
       }
+
+      const player = room.getPlayer(playerId);
+      if (player) {
+        gameLoop.onPlayerJoin(player);
+      }
       
       socket.emit('welcome', {
         type: 'S_WELCOME',
@@ -61,8 +66,9 @@ describe('Integration Tests', () => {
         timestamp: Date.now(),
       });
 
-      socket.on('disconnect', () => {
-        void room.removePlayer(playerId);
+      socket.on('disconnect', async () => {
+        await room.removePlayer(playerId);
+        gameLoop.onPlayerLeave(playerId);
       });
 
       socket.on('input', (data) => {

@@ -1,4 +1,11 @@
-import type { Vector3, PlayerState, WormState, ThumperState } from '@fremen/shared';
+import type {
+  Vector3,
+  PlayerState,
+  WormState,
+  ThumperState,
+  DamageSource,
+  OutpostState,
+} from '@fremen/shared';
 
 export interface C_INPUT {
   type: 'C_INPUT';
@@ -33,6 +40,7 @@ export interface S_STATE {
   players: PlayerState[];
   worms: WormState[];
   thumpers: ThumperState[];
+  outposts?: OutpostState[];
   objective?: {
     id: string;
     type: string;
@@ -70,5 +78,55 @@ export interface S_EVENT {
   data: unknown;
 }
 
-export type ClientMessage = C_INPUT | C_CHAT;
-export type ServerMessage = S_WELCOME | S_STATE | S_SNAPSHOT | S_CHAT | S_EVENT;
+export interface C_COMBAT_FIRE {
+  type: 'C_COMBAT_FIRE';
+  weaponId: string;
+  targetId: string;
+  origin?: Vector3;
+}
+
+export type CombatEventMessage =
+  | {
+      type: 'fire';
+      attackerId: string;
+      weaponId: string;
+      targetId?: string;
+      origin?: Vector3;
+    }
+  | {
+      type: 'damage';
+      targetId: string;
+      amount: number;
+      remainingHealth: number;
+      attackerId?: string;
+      source: DamageSource;
+      weaponId?: string;
+    }
+  | {
+      type: 'death';
+      targetId: string;
+      attackerId?: string;
+      position: Vector3;
+      source: DamageSource;
+    }
+  | {
+      type: 'respawn';
+      targetId: string;
+      position: Vector3;
+      health: number;
+    };
+
+export interface S_COMBAT_EVENT {
+  type: 'S_COMBAT_EVENT';
+  event: CombatEventMessage;
+  timestamp: number;
+}
+
+export type ClientMessage = C_INPUT | C_CHAT | C_COMBAT_FIRE;
+export type ServerMessage =
+  | S_WELCOME
+  | S_STATE
+  | S_SNAPSHOT
+  | S_CHAT
+  | S_EVENT
+  | S_COMBAT_EVENT;
