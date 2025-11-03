@@ -14,3 +14,6 @@ export const GAME_CONSTANTS = {
   WORM_TURN_RATE: Math.PI / 4,
   WORM_INITIAL_HEALTH: 1000,
 };
+
+export { COMBAT_CONSTANTS } from './combat.js';
+export { VS4_CONSTANTS } from './vs4.js';

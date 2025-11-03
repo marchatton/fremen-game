@@ -265,6 +265,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 1000,
         deaths: 2,
         wormsRidden: 3,
+        outpostsCaptured: 0,
       };
 
       const result = manager.processDeath(playerId, deathPosition, spice, stats);
@@ -285,6 +286,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       });
 
       const corpse = manager.getCorpseMarker(result.corpseId);
@@ -300,6 +302,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 5,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
 
       const result = manager.processDeath('player-1', { x: 0, y: 0, z: 0 }, 0, stats);
@@ -314,6 +317,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 2000,
         deaths: 2,
         wormsRidden: 8,
+        outpostsCaptured: 0,
       };
 
       const result = manager.processDeath('player-1', { x: 0, y: 0, z: 0 }, 0, stats);
@@ -369,6 +373,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       });
 
       expect(result.spiceLost).toBe(0);
@@ -408,6 +413,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 2000,
         deaths: 0,
         wormsRidden: 5,
+        outpostsCaptured: 0,
       };
 
       // Player dies
@@ -439,6 +445,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       });
 
       spice = deathResult.spiceRemaining; // 80
@@ -464,6 +471,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       });
 
       // Time passes (3 minutes)
@@ -484,6 +492,7 @@ describe('VS3: Death & Respawn System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
 
       // First death

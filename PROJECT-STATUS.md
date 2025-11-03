@@ -71,28 +71,28 @@
 - **Equipment**: Stillsuit tiers (25%/50%/75% water reduction), buy/sell at 50%
 - **Merchant**: Safe zone at Sietch (30m radius), infinite stock
 - **Death**: 20% spice penalty, corpse markers (2min), respawn at Sietch
-- **Stats**: Track objectives, spice earned, distance, deaths, worms ridden
+- **Stats**: Track objectives, spice earned, distance, deaths, worms ridden, outposts captured
 
 **Duration**: ~1 day actual
 
-### 🔨 VS4: PvE Combat (In Progress - 1/3)
+### 🔨 VS4: PvE Combat (In Progress - 7/11)
 
-**Completed (1/11)**:
-1. ✅ HarkonnenAI - AI state machine with vision, patrol, combat, investigate, retreat states (47 tests)
+**Completed (7/11)**:
+1. ✅ HarkonnenAI - Modular perception/tactics/controller pipeline for patrol, combat, and retreat
+2. ✅ Health System - Shared combat pipeline with regen, persistence-aware respawn, and thirst damage integration
+3. ✅ Combat System - Player/AI fire routed through authoritative scheduler, emits damage/death/respawn events
+4. ✅ Outpost System - Harkonnen garrisons with capture timers, player rewards, and state broadcasts
+5. ✅ AI Manager - Patrol routes, squad upkeep, and combat delegation through the `SystemRegistry`
+6. ✅ Thumper Jamming & Bot Backfill - Active thumpers pause reinforcements; garrisons restock after configurable delays
+7. ✅ Integration Tests - VS4 outpost capture, jamming recovery, and mixed human/bot combat flows
 
-**Test Coverage**: 47 unit tests
+**Test Coverage**: 90+ VS4-focused unit and integration assertions across AI/combat suites
 
 **Planned**:
-2. ⏳ Health System - Player/Harkonnen damage, death
-3. ⏳ Combat System - Shooting mechanics, hit detection
-4. ⏳ Outpost System - Harkonnen spawn points
-5. ⏳ Patrol Routes - Procedural or fixed patrol paths
-6. ⏳ Alert System - Harkonnen coordination on detection
-7. ⏳ Thumper Jamming - Harkonnen can disable thumpers
 8. ⏳ Loot Drops - Spice/equipment from killed Harkonnen
-9. ⏳ Difficulty Scaling - More Harkonnen over time
-10. ⏳ Integration Tests - Complete combat scenarios
-11. ⏳ Documentation
+9. ⏳ Difficulty Scaling - Dynamic garrison sizes and weapon tiers
+10. ⏳ Client HUD Updates - Outpost capture/jamming visualisations
+11. ⏳ Documentation - Player-facing combat & outpost guide
 
 ### 📋 VS5: Squad Cooperation (Not Started)
 - Role specialization
@@ -111,6 +111,7 @@
 - ✅ ESLint + shared configs
 - ✅ GitHub Actions CI (lint + typecheck)
 - ✅ Comprehensive test suite (512 tests, 100% passing)
+- ✅ SystemRegistry-based authoritative scheduler (physics/combat/persistence modules)
 
 ### Networking
 - ✅ Socket.io with JWT auth
@@ -132,6 +133,7 @@
 - ✅ **Merchant**: Buy/sell, safe zone trading
 - ✅ **Death/Respawn**: Corpse markers, recovery, stat tracking
 - ✅ **Rewards**: Objective completion bonuses
+- ✅ **Combat Core**: Regenerating health, shared damage events, AI/player fire integration
 
 ### Database
 - ✅ DrizzleORM with PostgreSQL
@@ -183,10 +185,10 @@ pnpm run build
 
 ## Next Steps
 
-1. **VS4: PvE Combat** - Continue with Health/Combat systems (HarkonnenAI complete ✅)
-2. **Client Integration** - Wire up VS3 UI and network messages
-3. **Playtesting** - Validate resource loop fun factor
-4. **Balance** - Tune water depletion rates and rewards
+1. **VS4: PvE Combat** - Extend Harkonnen AI with outposts, jamming, and squad coordination atop the new combat core
+2. **Client Integration** - Surface combat events and health states in the HUD
+3. **Playtesting** - Validate resource loop and combat pacing
+4. **Balance** - Tune water depletion rates, regen, and damage values
 
 ## Known Issues
 

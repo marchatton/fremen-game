@@ -80,6 +80,11 @@ io.on('connection', async (socket) => {
     return;
   }
 
+  const joinedPlayer = mainRoom.getPlayer(playerId);
+  if (joinedPlayer) {
+    gameLoop.onPlayerJoin(joinedPlayer);
+  }
+
   socket.emit('welcome', {
     type: 'S_WELCOME',
     playerId,
@@ -89,6 +94,7 @@ io.on('connection', async (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${username} (${playerId})`);
+    gameLoop.onPlayerLeave(playerId);
     void mainRoom.removePlayer(playerId);
   });
 
@@ -140,6 +146,19 @@ io.on('connection', async (socket) => {
         velocity,
         rotation,
       });
+    }
+  });
+
+  socket.on('combat', (data) => {
+    const success = gameLoop.handlePlayerFire(playerId, {
+      weaponId: data.weaponId,
+      targetId: data.targetId,
+      damage: data.damage,
+      origin: data.origin,
+    });
+
+    if (!success) {
+      socket.emit('combatResult', { success: false, reason: 'Invalid combat payload' });
     }
   });
 

@@ -36,6 +36,7 @@ export async function loadPlayer(playerId: string, username: string): Promise<Pl
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       },
       lastPosition: { x: 0, y: 0, z: 0 },
     };

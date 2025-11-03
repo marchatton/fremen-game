@@ -1,4 +1,4 @@
-import { ECONOMY_CONSTANTS, PlayerStats } from '@fremen/shared';
+import { ECONOMY_CONSTANTS, PlayerStats, VS4_CONSTANTS } from '@fremen/shared';
 
 interface RewardResult {
   success: boolean;
@@ -42,6 +42,25 @@ export class RewardManager {
       ...stats,
       objectivesCompleted: stats.objectivesCompleted + 1,
       totalSpiceEarned: stats.totalSpiceEarned + spiceEarned,
+    };
+  }
+
+  grantOutpostReward(currentSpice: number, currentWater: number): RewardResult {
+    const safeSpice = Math.max(0, currentSpice);
+    const safeWater = Math.max(0, currentWater);
+
+    return {
+      success: true,
+      spice: safeSpice + VS4_CONSTANTS.OUTPOST_REWARD_SPICE,
+      water: Math.min(100, safeWater + VS4_CONSTANTS.OUTPOST_REWARD_WATER),
+    };
+  }
+
+  recordOutpostCapture(stats: PlayerStats): PlayerStats {
+    return {
+      ...stats,
+      outpostsCaptured: stats.outpostsCaptured + 1,
+      totalSpiceEarned: stats.totalSpiceEarned + VS4_CONSTANTS.OUTPOST_REWARD_SPICE,
     };
   }
 

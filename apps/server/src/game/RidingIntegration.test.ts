@@ -10,12 +10,27 @@ describe('VS2: Riding Integration (End-to-End)', () => {
   let gameLoop: GameLoop;
   let mockSocket: Partial<Socket>;
   let repository: InMemoryPlayerRepository;
+  let addPlayerWithJoin: (socket: Socket, playerId: string, username: string) => Promise<void>;
   const SEED = 12345;
+
+  const advanceGameLoop = (deltaTime: number, steps = 1) => {
+    for (let i = 0; i < steps; i++) {
+      (gameLoop as any).registry.update(deltaTime);
+    }
+  };
 
   beforeEach(() => {
     repository = new InMemoryPlayerRepository();
     room = new Room('test-room', repository);
     gameLoop = new GameLoop(room, SEED, repository);
+
+    addPlayerWithJoin = async (socket: Socket, playerId: string, username: string) => {
+      await room.addPlayer(socket, playerId, username);
+      const player = room.getPlayer(playerId);
+      if (player) {
+        gameLoop.onPlayerJoin(player);
+      }
+    };
 
     mockSocket = {
       id: 'socket-1',
@@ -32,7 +47,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
   describe('Complete Gameplay Loop', () => {
     it('should complete full loop: deploy thumper → mount → steer → complete objective → dismount', async () => {
       // 1. Add player
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // 2. Deploy thumper
@@ -62,7 +77,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Steer toward objective for several ticks
       for (let i = 0; i < 30; i++) {
         gameLoop.handleWormControl('worm-0', 1.0, 1.0);
-        (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
+        advanceGameLoop(1 / GAME_CONSTANTS.TICK_RATE);
       }
 
       // 6. Complete objective (manually for test)
@@ -82,7 +97,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle thumper attraction → mount → ride sequence', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       // Deploy thumper
@@ -90,7 +105,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       room.deployThumper('player1');
 
       // Update game state to process thumper attraction
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       const worms = (gameLoop as any).wormAI.getWorms();
       const worm = worms[0];
@@ -105,14 +120,14 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       expect(mountResult.success).toBe(true);
 
       // Player position should sync to worm segment during update
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       expect(player.state.position.x).toBe(worm.controlPoints[2].x);
       expect(player.state.position.z).toBe(worm.controlPoints[2].z);
     });
 
     it('should handle objective expiration while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -138,7 +153,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle worm death while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -154,7 +169,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       worm.controlPoints[0] = { x: 0, y: -20, z: 0 };
 
       // Update game loop (should detect damage and dismount player)
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       const damage = (gameLoop as any).wormDamage.checkTerrainDamage(worm);
       const died = (gameLoop as any).wormDamage.applyDamage(worm, damage);
@@ -179,8 +194,8 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should allow multiple players to see rider', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'Player1');
-      await room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'Player1');
+      await addPlayerWithJoin(mockSocket2 as Socket, 'player2', 'Player2');
 
       const player1 = room.getPlayer('player1')!;
       const player2 = room.getPlayer('player2')!;
@@ -190,7 +205,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       gameLoop.handleMountAttempt('player1', 'worm-0');
 
       // Update game state
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       // Verify player1 is riding
       expect(player1.state.state).toBe(PlayerStateEnum.RIDING);
@@ -205,8 +220,8 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should prevent player2 from mounting while player1 is riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'Player1');
-      await room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'Player1');
+      await addPlayerWithJoin(mockSocket2 as Socket, 'player2', 'Player2');
 
       const player1 = room.getPlayer('player1')!;
       const player2 = room.getPlayer('player2')!;
@@ -227,8 +242,8 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should allow quick succession mount after dismount', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'Player1');
-      await room.addPlayer(mockSocket2 as Socket, 'player2', 'Player2');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'Player1');
+      await addPlayerWithJoin(mockSocket2 as Socket, 'player2', 'Player2');
 
       const player1 = room.getPlayer('player1')!;
       const player2 = room.getPlayer('player2')!;
@@ -250,7 +265,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
   describe('State Synchronization', () => {
     it('should sync player position to worm segment while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -259,7 +274,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Update game state multiple times
       for (let i = 0; i < 10; i++) {
         gameLoop.handleWormControl('worm-0', 1.0, 1.0);
-        (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
+        advanceGameLoop(1 / GAME_CONSTANTS.TICK_RATE);
 
         const worms = (gameLoop as any).wormAI.getWorms();
         const worm = worms.find((w: any) => w.id === 'worm-0');
@@ -272,7 +287,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should clear player velocity while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -280,13 +295,13 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       gameLoop.handleMountAttempt('player1', 'worm-0');
 
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       expect(player.state.velocity).toEqual({ x: 0, y: 0, z: 0 });
     });
 
     it('should not apply physics validation while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -295,7 +310,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Manually set invalid velocity (would be clamped if on foot)
       player.state.velocity = { x: 1000, y: 1000, z: 1000 };
 
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       // Velocity should be zeroed (riding state), not clamped to max speed
       expect(player.state.velocity).toEqual({ x: 0, y: 0, z: 0 });
@@ -304,7 +319,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
   describe('Objective Integration', () => {
     it('should detect objective completion when worm enters radius', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       const objective = (gameLoop as any).objectiveManager.getActiveObjective();
@@ -319,13 +334,13 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       worm.controlPoints[0] = { ...objective.targetPosition };
 
       // Update game loop
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       expect(objective.status).toBe(ObjectiveStatus.COMPLETED);
     });
 
     it('should check objective completion every tick while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -336,7 +351,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Steer toward objective
       for (let i = 0; i < 100; i++) {
         gameLoop.handleWormControl('worm-0', 0.5, 1.0);
-        (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
+        advanceGameLoop(1 / GAME_CONSTANTS.TICK_RATE);
 
         if (objective.status === ObjectiveStatus.COMPLETED) {
           expect(i).toBeGreaterThan(0); // Should complete at some point
@@ -346,7 +361,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should not check objective when not riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       const objective = (gameLoop as any).objectiveManager.getActiveObjective();
@@ -354,7 +369,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Move player to objective without riding
       player.state.position = { ...objective.targetPosition };
 
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       // Objective should not complete (only worms can complete objectives)
       expect(objective.status).toBe(ObjectiveStatus.ACTIVE);
@@ -363,7 +378,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
   describe('Damage Integration', () => {
     it('should damage worm when hitting terrain while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -376,13 +391,13 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       // Move worm into terrain
       worm.controlPoints[0] = { x: 0, y: -20, z: 0 };
 
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       expect(worm.health).toBeLessThan(initialHealth);
     });
 
     it('should auto-dismount player when worm dies', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -395,7 +410,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       worm.health = 10;
       worm.controlPoints[0] = { x: 0, y: -20, z: 0 };
 
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
 
       // Check if worm died and player was dismounted
       if (worm.health === 0) {
@@ -406,7 +421,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
   describe('Performance and Stability', () => {
     it('should handle 100 game loop ticks without errors', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -415,13 +430,13 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       expect(() => {
         for (let i = 0; i < 100; i++) {
           gameLoop.handleWormControl('worm-0', Math.random() * 2 - 1, Math.random() * 2 - 1);
-          (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
+          advanceGameLoop(1 / GAME_CONSTANTS.TICK_RATE);
         }
       }).not.toThrow();
     });
 
     it('should maintain worm control point count during long ride', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -429,7 +444,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
       for (let i = 0; i < 300; i++) {
         gameLoop.handleWormControl('worm-0', 1.0, 1.0);
-        (gameLoop as any).updateGameState(1 / GAME_CONSTANTS.TICK_RATE);
+        advanceGameLoop(1 / GAME_CONSTANTS.TICK_RATE);
 
         const worms = (gameLoop as any).wormAI.getWorms();
         const worm = worms[0];
@@ -440,7 +455,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle rapid mount/dismount cycles', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       for (let i = 0; i < 20; i++) {
@@ -462,7 +477,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle steering with extreme deltaTime variations', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };
@@ -473,7 +488,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       expect(() => {
         for (const dt of deltaTimes) {
           gameLoop.handleWormControl('worm-0', 1.0, 1.0);
-          (gameLoop as any).updateGameState(dt);
+          advanceGameLoop(dt);
         }
       }).not.toThrow();
     });
@@ -481,7 +496,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
 
   describe('Edge Case Combinations', () => {
     it('should handle objective completion during dismount', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       const objective = (gameLoop as any).objectiveManager.getActiveObjective();
@@ -495,7 +510,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
       worm.controlPoints[0] = { ...objective.targetPosition };
 
       // Objective should already be completed during riding
-      (gameLoop as any).updateGameState(0.033);
+      advanceGameLoop(0.033);
       expect(objective.status).toBe(ObjectiveStatus.COMPLETED);
 
       // Dismount after objective is complete
@@ -507,7 +522,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle thumper expiration while riding', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 10, y: 0, z: 10 };
@@ -530,7 +545,7 @@ describe('VS2: Riding Integration (End-to-End)', () => {
     });
 
     it('should handle player reaching max speed before mounting', async () => {
-      await room.addPlayer(mockSocket as Socket, 'player1', 'TestPlayer');
+      await addPlayerWithJoin(mockSocket as Socket, 'player1', 'TestPlayer');
       const player = room.getPlayer('player1')!;
 
       player.state.position = { x: 52, y: 0, z: 50 };

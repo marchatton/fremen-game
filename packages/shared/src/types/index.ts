@@ -43,3 +43,24 @@ export interface ThumperState {
   active: boolean;
   expiresAt: number;
 }
+
+export type DamageSource = 'player' | 'ai' | 'environment';
+
+export interface HealthState {
+  current: number;
+  max: number;
+  regenRate: number;
+}
+
+export type Faction = 'harkonnen' | 'fremen';
+
+export interface OutpostState {
+  id: string;
+  position: Vector3;
+  radius: number;
+  controllingFaction: Faction;
+  captureProgress: number;
+  captureTarget: number;
+  garrisonSize: number;
+  jammedUntil?: number;
+}

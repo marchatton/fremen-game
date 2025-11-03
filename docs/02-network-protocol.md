@@ -92,6 +92,17 @@ Join matchmaking queue.
 }
 ```
 
+#### C_COMBAT_FIRE
+Request the server to fire the currently equipped weapon. The server validates range, cooldowns, and target visibility before applying damage.
+```typescript
+{
+  type: "C_COMBAT_FIRE",
+  weaponId: string,
+  targetId: string,
+  origin?: [x: number, y: number, z: number]
+}
+```
+
 ### Server → Client Messages
 
 #### S_STATE (Main State Update)
@@ -124,6 +135,20 @@ Delta state update broadcast at 10-20hz.
     }
   ],
   removed?: [12, 34, 56]                // Removed entity IDs
+}
+```
+
+#### S_COMBAT_EVENT
+Authoritative combat events emitted after validation. Clients should play effects/UI feedback based on `event.type`.
+```typescript
+{
+  type: "S_COMBAT_EVENT",
+  timestamp: number,
+  event:
+    | { type: "fire"; attackerId: string; weaponId: string; targetId?: string; origin?: [x, y, z] }
+    | { type: "damage"; targetId: string; amount: number; remainingHealth: number; attackerId?: string; source: "player" | "ai" | "environment"; weaponId?: string }
+    | { type: "death"; targetId: string; attackerId?: string; position: [x, y, z]; source: "player" | "ai" | "environment" }
+    | { type: "respawn"; targetId: string; position: [x, y, z]; health: number }
 }
 ```
 

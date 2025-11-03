@@ -63,6 +63,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
     });
 
@@ -110,6 +111,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
     });
 
@@ -145,6 +147,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
     });
 
@@ -175,6 +178,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
     });
 
@@ -250,6 +254,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
 
       const newStats = manager.addDistanceTraveled(stats, 0);
@@ -268,6 +273,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
 
       // Grant reward
@@ -289,6 +295,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 500,
         deaths: 1,
         wormsRidden: 5,
+        outpostsCaptured: 0,
       };
 
       for (let i = 0; i < 10; i++) {
@@ -313,6 +320,7 @@ describe('VS3: Reward System', () => {
         distanceTraveled: 0,
         deaths: 0,
         wormsRidden: 0,
+        outpostsCaptured: 0,
       };
 
       // Session 1: 5 objectives, 3 worms ridden, 1000m traveled, 0 deaths
