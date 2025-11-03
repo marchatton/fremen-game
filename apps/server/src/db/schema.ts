@@ -21,6 +21,7 @@ export const players = pgTable('players', {
     distanceTraveled: 0,
     deaths: 0,
     wormsRidden: 0,
+    outpostsCaptured: 0,
   })),
 
   // Last known position

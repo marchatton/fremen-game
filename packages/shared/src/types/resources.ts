@@ -63,6 +63,7 @@ export interface PlayerStats {
   distanceTraveled: number;
   deaths: number;
   wormsRidden: number;
+  outpostsCaptured: number;
 }
 
 // Spice Nodes
@@ -176,6 +177,7 @@ export const STARTING_RESOURCES: Partial<PlayerResources> = {
     distanceTraveled: 0,
     deaths: 0,
     wormsRidden: 0,
+    outpostsCaptured: 0,
   },
   inventory: [
     {

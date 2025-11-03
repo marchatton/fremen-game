@@ -33,6 +33,10 @@ describe('GameLoop persistence integration', () => {
     const gameLoop = new GameLoop(room, 12345, repository);
 
     await room.addPlayer(createMockSocket(), 'player1', 'Test');
+    const player = room.getPlayer('player1');
+    if (player) {
+      gameLoop.onPlayerJoin(player);
+    }
     (gameLoop as any).tick();
 
     expect(repository.updateSnapshot).toHaveBeenCalledWith(

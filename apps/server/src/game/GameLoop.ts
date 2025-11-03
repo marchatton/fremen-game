@@ -1,4 +1,6 @@
 import { GAME_CONSTANTS, PlayerStateEnum, ECONOMY_CONSTANTS } from '@fremen/shared';
+import type { EquipmentStats, Vector3 } from '@fremen/shared';
+import type { CombatEventMessage } from '@fremen/protocol';
 import type { Room, RoomPlayer } from './Room';
 import { Physics } from './sim/Physics';
 import { WormAI } from './sim/WormAI';
@@ -12,6 +14,11 @@ import { SietchManager } from './SietchManager';
 import { RewardManager } from './RewardManager';
 import { DeathManager } from './DeathManager';
 import type { PlayerRepository } from './PlayerRepository';
+import { SystemRegistry } from './SystemRegistry';
+import type { GameSystem } from './SystemRegistry';
+import { CombatSystem } from './CombatSystem';
+import { OutpostManager } from './OutpostManager';
+import { AIManager } from './ai/AIManager';
 
 export class GameLoop {
   private room: Room;
@@ -28,6 +35,12 @@ export class GameLoop {
   private sietchManager: SietchManager;
   private rewardManager: RewardManager;
   private deathManager: DeathManager;
+  private registry: SystemRegistry;
+  private combatSystem: CombatSystem;
+  private outpostManager: OutpostManager;
+  private aiManager: AIManager;
+  private equipmentStatsCache = new Map<string, EquipmentStats>();
+  private lastPositions = new Map<string, { x: number; z: number }>();
 
   private tickCount = 0;
   private lastTickTime = Date.now();
@@ -56,6 +69,42 @@ export class GameLoop {
     this.spiceManager.generateNodes();
     this.oasisManager.generateOases();
 
+    this.registry = new SystemRegistry();
+    this.combatSystem = new CombatSystem(this.room, {
+      deathManager: this.deathManager,
+      onPersistenceSnapshot: player => this.queuePersistenceUpdate(player),
+    });
+
+    this.combatSystem.onEvent(event => this.broadcastCombatEvent(event));
+
+    this.outpostManager = new OutpostManager(
+      this.room,
+      playerId => this.rewardOutpostCapture(playerId),
+      () => this.room.getActiveThumpers()
+    );
+
+    this.aiManager = new AIManager(this.room, this.combatSystem, this.outpostManager);
+
+    this.outpostManager.setGarrisonProvider(
+      outpostId => this.aiManager.getTroopersForOutpost(outpostId).length
+    );
+    this.outpostManager.setFactionChangeHandler((outpostId, faction) => {
+      this.aiManager.onOutpostFactionChange(outpostId, faction);
+    });
+
+    this.registry.registerSystem(this.combatSystem);
+    this.registry.registerSystem(this.outpostManager);
+    this.registry.registerSystem(this.aiManager);
+    this.registry.registerSystem(this.createEquipmentSystem());
+    this.registry.registerSystem(this.createWormSystem());
+    this.registry.registerSystem(this.createPhysicsSystem());
+    this.registry.registerSystem(this.createWaterSystem());
+    this.registry.registerSystem(this.createRewardSystem());
+    this.registry.registerSystem(this.createSpiceSystem());
+    this.registry.registerSystem(this.createOasisSystem());
+    this.registry.registerSystem(this.createPersistenceSystem());
+    this.registry.registerSystem(this.createHousekeepingSystem());
+
     console.log('VS3 systems initialized');
   }
 
@@ -73,137 +122,43 @@ export class GameLoop {
     }
   }
 
+  onPlayerJoin(player: RoomPlayer): void {
+    this.registry.onPlayerJoin(player);
+    this.lastPositions.set(player.playerId, {
+      x: player.state.position.x,
+      z: player.state.position.z,
+    });
+  }
+
+  onPlayerLeave(playerId: string): void {
+    this.registry.onPlayerLeave(playerId);
+    this.lastPositions.delete(playerId);
+    this.equipmentStatsCache.delete(playerId);
+  }
+
   private tick() {
     this.tickCount++;
     const now = Date.now();
     const deltaTime = (now - this.lastTickTime) / 1000;
     this.lastTickTime = now;
 
-    this.updateGameState(deltaTime);
+    this.registry.update(deltaTime);
     this.broadcastState();
 
     if (this.tickCount % GAME_CONSTANTS.TICK_RATE === 0) {
       console.log(`Tick ${this.tickCount} - Players: ${this.room.getPlayerCount()}`);
     }
-
-    if (this.tickCount % (GAME_CONSTANTS.TICK_RATE * 60) === 0) {
-      this.room.cleanupDisconnectedPlayers();
-    }
   }
 
-  private updateGameState(deltaTime: number) {
-    const players = this.room.getAllPlayers();
+  private broadcastCombatEvent(event: CombatEventMessage): void {
+    const payload = {
+      type: 'S_COMBAT_EVENT' as const,
+      event,
+      timestamp: Date.now(),
+    };
 
-    this.wormAI.update(deltaTime);
-
-    // Track previous positions for distance calculation
-    const previousPositions = new Map<string, {x: number, z: number}>();
-
-    for (const player of players) {
-      // Store previous position
-      previousPositions.set(player.playerId, {
-        x: player.state.position.x,
-        z: player.state.position.z,
-      });
-
-      if (player.state.state === PlayerStateEnum.RIDING && player.state.ridingWormId) {
-        const worm = this.wormAI.getWorm(player.state.ridingWormId);
-        if (worm && worm.controlPoints.length >= 3) {
-          const segment = worm.controlPoints[2];
-          player.state.position = { ...segment };
-          player.state.velocity = { x: 0, y: 0, z: 0 };
-        }
-      } else {
-        if (!this.physics.validatePlayerSpeed(player.state.velocity)) {
-          console.warn(`Speed hack detected for player ${player.playerId}`);
-          player.state.velocity = this.physics.clampVelocity(player.state.velocity);
-        }
-
-        player.state.position = this.physics.validatePlayerPosition(
-          player.state.position,
-          player.state.velocity,
-          deltaTime
-        );
-      }
-
-      // VS3: Water depletion
-      if (player.state.state !== PlayerStateEnum.DEAD) {
-        const waterReduction = this.equipmentManager.calculateWaterReduction(player.resources.equipment);
-        player.resources.water = this.waterSystem.calculateWaterDepletion(
-          player.resources.water,
-          player.state,
-          deltaTime,
-          waterReduction
-        );
-
-        // Apply thirst effects
-        const effect = this.waterSystem.getThirstEffects(player.resources.water);
-
-        // Apply health drain
-        if (effect.healthDrain > 0) {
-          player.health -= effect.healthDrain * deltaTime;
-          player.health = Math.max(0, player.health);
-        }
-
-        // Check for death
-        if (this.deathManager.checkDeath(player.resources.water) || player.health <= 0) {
-          this.handlePlayerDeath(player.playerId);
-        }
-      }
-
-      // VS3: Track distance traveled
-      const prevPos = previousPositions.get(player.playerId);
-      if (prevPos && player.state.state !== PlayerStateEnum.DEAD) {
-        const distance = Math.sqrt(
-          Math.pow(player.state.position.x - prevPos.x, 2) +
-          Math.pow(player.state.position.z - prevPos.z, 2)
-        );
-        player.resources.stats = this.rewardManager.addDistanceTraveled(
-          player.resources.stats,
-          distance
-        );
-      }
-    }
-
-    // VS3: Update spice harvesting
-    this.spiceManager.update(deltaTime);
-
-    this.room.updateThumpers();
-    
-    const activeThumpers = this.room.getActiveThumpers();
-    for (const thumper of activeThumpers) {
-      const nearestWormId = this.wormAI.findNearestWorm(thumper.position);
-      if (nearestWormId) {
-        this.wormAI.setWormTarget(nearestWormId, thumper.position);
-      }
-    }
-
-    this.objectiveManager.update();
-
-    const worms = this.wormAI.getWorms();
-    for (const worm of worms) {
-      if (worm.aiState === 'RIDDEN_BY' && worm.controlPoints.length > 0) {
-        const completed = this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
-
-        // VS3: Grant reward to rider on objective completion
-        if (completed && worm.riderId) {
-          this.grantObjectiveReward(worm.riderId);
-        }
-      }
-
-      const damage = this.wormDamage.checkTerrainDamage(worm);
-      if (damage > 0) {
-        const died = this.wormDamage.applyDamage(worm, damage);
-
-        if (died && worm.riderId) {
-          this.handleDismount(worm.riderId);
-          console.log(`Worm ${worm.id} died, ejecting rider`);
-        }
-      }
-    }
-
-    for (const player of players) {
-      this.queuePersistenceUpdate(player);
+    for (const player of this.room.getAllPlayers()) {
+      player.socket.emit('combat', payload);
     }
   }
 
@@ -212,7 +167,8 @@ export class GameLoop {
     const worms = this.wormAI.getWorms();
     const thumpers = this.room.getThumpers();
     const objective = this.objectiveManager.getActiveObjective();
-    
+    const outposts = this.outpostManager.getOutposts();
+
     for (const player of players) {
       const stateMessage = {
         type: 'S_STATE',
@@ -221,6 +177,7 @@ export class GameLoop {
         players: players.map(p => p.state),
         worms,
         thumpers,
+        outposts,
         objective: objective ? {
           id: objective.id,
           type: objective.type,
@@ -233,6 +190,193 @@ export class GameLoop {
       
       player.socket.emit('state', stateMessage);
     }
+  }
+
+  private createEquipmentSystem(): GameSystem {
+    return {
+      onPlayerJoin: (player: RoomPlayer) => {
+        const stats = this.equipmentManager.calculateTotalStats(player.resources.equipment);
+        this.equipmentStatsCache.set(player.playerId, stats);
+      },
+      onPlayerLeave: (playerId: string) => {
+        this.equipmentStatsCache.delete(playerId);
+      },
+      update: () => {
+        for (const player of this.room.getAllPlayers()) {
+          const stats = this.equipmentManager.calculateTotalStats(player.resources.equipment);
+          this.equipmentStatsCache.set(player.playerId, stats);
+        }
+      },
+    };
+  }
+
+  private createWormSystem(): GameSystem {
+    return {
+      update: (deltaTime: number) => {
+        this.wormAI.update(deltaTime);
+        this.room.updateThumpers();
+
+        const activeThumpers = this.room.getActiveThumpers();
+        for (const thumper of activeThumpers) {
+          const nearestWormId = this.wormAI.findNearestWorm(thumper.position);
+          if (nearestWormId) {
+            this.wormAI.setWormTarget(nearestWormId, thumper.position);
+          }
+        }
+
+        this.objectiveManager.update();
+
+        const worms = this.wormAI.getWorms();
+        for (const worm of worms) {
+          if (worm.aiState === 'RIDDEN_BY' && worm.controlPoints.length > 0) {
+            const completed = this.objectiveManager.checkObjectiveCompletion(worm.controlPoints[0]);
+            if (completed && worm.riderId) {
+              this.grantObjectiveReward(worm.riderId);
+            }
+          }
+
+          const damage = this.wormDamage.checkTerrainDamage(worm);
+          if (damage > 0) {
+            const died = this.wormDamage.applyDamage(worm, damage);
+            if (died && worm.riderId) {
+              this.handleDismount(worm.riderId);
+              console.log(`Worm ${worm.id} died, ejecting rider`);
+            }
+          }
+        }
+      },
+    };
+  }
+
+  private createPhysicsSystem(): GameSystem {
+    return {
+      update: (deltaTime: number) => {
+        for (const player of this.room.getAllPlayers()) {
+          if (player.state.state === PlayerStateEnum.RIDING && player.state.ridingWormId) {
+            const worm = this.wormAI.getWorm(player.state.ridingWormId);
+            if (worm && worm.controlPoints.length >= 3) {
+              const segment = worm.controlPoints[2];
+              player.state.position = { ...segment };
+              player.state.velocity = { x: 0, y: 0, z: 0 };
+            }
+          } else {
+            if (!this.physics.validatePlayerSpeed(player.state.velocity)) {
+              console.warn(`Speed hack detected for player ${player.playerId}`);
+              player.state.velocity = this.physics.clampVelocity(player.state.velocity);
+            }
+
+            player.state.position = this.physics.validatePlayerPosition(
+              player.state.position,
+              player.state.velocity,
+              deltaTime
+            );
+          }
+        }
+      },
+    };
+  }
+
+  private createWaterSystem(): GameSystem {
+    return {
+      update: (deltaTime: number) => {
+        for (const player of this.room.getAllPlayers()) {
+          if (player.state.state === PlayerStateEnum.DEAD) {
+            continue;
+          }
+
+          const stats = this.equipmentStatsCache.get(player.playerId);
+          const waterReduction = stats?.waterReduction ?? this.equipmentManager.calculateWaterReduction(player.resources.equipment);
+
+          player.resources.water = this.waterSystem.calculateWaterDepletion(
+            player.resources.water,
+            player.state,
+            deltaTime,
+            waterReduction
+          );
+
+          const effect = this.waterSystem.getThirstEffects(player.resources.water);
+          if (effect.healthDrain > 0) {
+            this.combatSystem.applyDamageByEnvironment(
+              player.playerId,
+              effect.healthDrain * deltaTime
+            );
+          }
+
+          if (this.deathManager.checkDeath(player.resources.water)) {
+            this.combatSystem.applyDamageByEnvironment(
+              player.playerId,
+              Math.max(player.health, 1)
+            );
+          }
+        }
+      },
+    };
+  }
+
+  private createRewardSystem(): GameSystem {
+    return {
+      update: () => {
+        for (const player of this.room.getAllPlayers()) {
+          const prev = this.lastPositions.get(player.playerId);
+          if (prev && player.state.state !== PlayerStateEnum.DEAD) {
+            const distance = Math.sqrt(
+              Math.pow(player.state.position.x - prev.x, 2) +
+              Math.pow(player.state.position.z - prev.z, 2)
+            );
+            player.resources.stats = this.rewardManager.addDistanceTraveled(
+              player.resources.stats,
+              distance
+            );
+          }
+
+          this.lastPositions.set(player.playerId, {
+            x: player.state.position.x,
+            z: player.state.position.z,
+          });
+        }
+      },
+    };
+  }
+
+  private createSpiceSystem(): GameSystem {
+    return {
+      update: (deltaTime: number) => {
+        this.spiceManager.update(deltaTime);
+      },
+    };
+  }
+
+  private createOasisSystem(): GameSystem {
+    let accumulator = 0;
+    return {
+      update: (deltaTime: number) => {
+        accumulator += deltaTime;
+        if (accumulator >= 1) {
+          this.oasisManager.cleanupExpiredCooldowns();
+          accumulator = 0;
+        }
+      },
+    };
+  }
+
+  private createPersistenceSystem(): GameSystem {
+    return {
+      update: () => {
+        for (const player of this.room.getAllPlayers()) {
+          this.queuePersistenceUpdate(player);
+        }
+      },
+    };
+  }
+
+  private createHousekeepingSystem(): GameSystem {
+    return {
+      update: () => {
+        if (this.tickCount % (GAME_CONSTANTS.TICK_RATE * 60) === 0) {
+          this.room.cleanupDisconnectedPlayers();
+        }
+      },
+    };
   }
 
   handleMountAttempt(playerId: string, wormId: string): { success: boolean; reason?: string } {
@@ -309,34 +453,8 @@ export class GameLoop {
     this.wormAI.steerWorm(wormId, direction, speedIntent, deltaTime);
   }
 
-  /**
-   * VS3: Handle player death
-   */
-  private handlePlayerDeath(playerId: string): void {
-    const player = this.room.getPlayer(playerId);
-    if (!player) return;
-
-    // Process death
-    const deathResult = this.deathManager.processDeath(
-      playerId,
-      player.state.position,
-      player.resources.spice,
-      player.resources.stats
-    );
-
-    // Update player state
-    player.state.state = PlayerStateEnum.DEAD;
-    player.state.position = { ...deathResult.respawnPosition };
-    player.resources.water = deathResult.respawnWater;
-   player.resources.spice = deathResult.spiceRemaining;
-    player.resources.stats = deathResult.newStats;
-    player.health = deathResult.respawnHealth;
-
-    // Reset to active state (respawn)
-    player.state.state = PlayerStateEnum.ACTIVE;
-    this.queuePersistenceUpdate(player);
-
-    console.log(`Player ${playerId} died and respawned at Sietch`);
+  handlePlayerFire(playerId: string, payload: { weaponId: string; targetId: string; damage?: number; origin?: Vector3 }): boolean {
+    return this.combatSystem.handlePlayerFire(playerId, payload);
   }
 
   /**
@@ -360,6 +478,30 @@ export class GameLoop {
     this.queuePersistenceUpdate(player);
 
     console.log(`Player ${playerId} completed objective: +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_SPICE} spice, +${ECONOMY_CONSTANTS.OBJECTIVE_REWARD_WATER} water`);
+  }
+
+  private rewardOutpostCapture(playerId: string): void {
+    const player = this.room.getPlayer(playerId);
+    if (!player) {
+      return;
+    }
+
+    const reward = this.rewardManager.grantOutpostReward(
+      player.resources.spice,
+      player.resources.water
+    );
+
+    const spiceDelta = reward.spice - player.resources.spice;
+    const waterDelta = reward.water - player.resources.water;
+
+    player.resources.spice = reward.spice;
+    player.resources.water = reward.water;
+    player.resources.stats = this.rewardManager.recordOutpostCapture(player.resources.stats);
+    this.queuePersistenceUpdate(player);
+
+    console.log(
+      `Player ${playerId} captured outpost: +${spiceDelta} spice, +${waterDelta} water`
+    );
   }
 
   private queuePersistenceUpdate(player: RoomPlayer): void {

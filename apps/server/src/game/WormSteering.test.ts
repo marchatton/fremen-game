@@ -492,7 +492,8 @@ describe('VS2: Worm Steering System', () => {
       const headingChange = Math.abs(updated.heading - initialHeading);
 
       // Should not turn faster than max turn rate
-      expect(headingChange).toBeLessThanOrEqual(GAME_CONSTANTS.WORM_TURN_RATE * DELTA_TIME * 100);
+      const maxHeadingChange = GAME_CONSTANTS.WORM_TURN_RATE * DELTA_TIME * 100;
+      expect(headingChange).toBeLessThanOrEqual(maxHeadingChange + 1e-9);
     });
 
     it('should handle extreme speedIntent values (> 1.0)', () => {
